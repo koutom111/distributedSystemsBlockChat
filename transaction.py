@@ -10,7 +10,6 @@
 # Signature: Υπογραφή που αποδεικνύει ότι ο κάτοχος του wallet δημιούργησε αυτό το transaction.
 
 
-
 import time
 import Crypto
 import Crypto.Random
@@ -18,11 +17,12 @@ from Crypto.Hash import SHA
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 
-def makeRSAjsonSendable(rsa):
+
+def makeRSAjsonSendable(rsa):                            #????
     return rsa.exportKey("PEM").decode('ascii')
 
 
-def makejsonSendableRSA(jsonSendable):
+def makejsonSendableRSA(jsonSendable):                  #????
     return RSA.importKey(jsonSendable.encode('ascii'))
 
 
@@ -32,28 +32,26 @@ class Transaction:
 
         self.sender_address = sender_address
         self.receiver_address = recipient_address
-        #type of transaction
+        # type of transaction
         self.amount = value
-        #message
-        #nonce
+        # message
+        # nonce
+        self.rand = Crypto.Random.get_random_bytes(10)
         self.transaction_id = SHA.new(
             (str(sender_address) + str(recipient_address) + str(value) + str(self.rand)).encode())
         self.signature = None
+        if not type(self.sender_address) == type(0):
+            self.signature = self.sign_transaction(sender_private_key)  # ?????
 
-
+        # helpers?????
+        self.transaction_myid = str(sender_address) + str(recipient_address) + str(value) + str(self.rand)
         self.reals = reals
         self.realr = realr
-        self.rand = Crypto.Random.get_random_bytes(10)
-
-        self.transaction_myid = str(sender_address) + str(recipient_address) + str(value) + str(self.rand)
         self.transaction_inputs = []
         self.transaction_outputs = []
         self.transaction_id_hex = self.transaction_id.hexdigest()
         self.timeCreated = time.time()
         self.timeAdded = None
-
-        if (not type(self.sender_address) == type(0)):
-            self.signature = self.sign_transaction(sender_private_key)
 
     def sign_transaction(self, private_key):
         """
@@ -62,8 +60,7 @@ class Transaction:
         signature = PKCS1_v1_5.new(private_key).sign(self.transaction_id)
         return signature
 
-
-    #???????
+    # helpers???????
     def verify_transaction(self):
         return True
 
