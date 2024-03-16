@@ -8,6 +8,7 @@
 # myport: το port του node
 # completed_transactions : vlepoume an to theloume
 # validated_transactions : vlepoume an to theloume
+
 from block import Block
 from wallet import Wallet
 from transaction import Transaction
@@ -108,14 +109,14 @@ class Node:
         transaction = Transaction(sender, sender_private_key, receiver, amount, reals=realsender, realr=realreceiver)
 
         if (not realsender == "genesis"):
-            transaction.transaction_inputs = self.current_NBCs[realsender][1]
+            transaction.transaction_inputs = self.current_BCCs[realsender][1]
 
             output_id1 = transaction.transaction_id_hex + 'a'
             output1 = [output_id1, transaction.transaction_id_hex, int(realreceiver), amount]
             transaction.transaction_outputs.append(output1)
 
             output_id2 = transaction.transaction_id_hex + 'b'
-            output2 = [output_id2, transaction.transaction_id_hex, int(realsender), self.current_NBCs[int(realsender)][0] - amount]
+            output2 = [output_id2, transaction.transaction_id_hex, int(realsender), self.current_BCCs[int(realsender)][0] - amount]
             transaction.transaction_outputs.append(output2)
 
         if(transaction.signature):
@@ -147,11 +148,11 @@ class Node:
         realsender = int(transaction.reals)
         realreceiver = int(transaction.realr)
 
-        if(verified and transaction.amount<=self.current_NBCs[int(realsender)][0]):
-            self.current_NBCs[realsender][0] = self.current_NBCs[realsender][0] - transaction.amount
-            self.current_NBCs[realsender][1].append(transaction.transaction_id_hex)
-            self.current_NBCs[realreceiver][0] = self.current_NBCs[realreceiver][0] + transaction.amount
-            self.current_NBCs[realreceiver][1].append(transaction.transaction_id_hex)
+        if(verified and transaction.amount<=self.current_BCCs[int(realsender)][0]):
+            self.current_BCCs[realsender][0] = self.current_BCCs[realsender][0] - transaction.amount
+            self.current_BCCs[realsender][1].append(transaction.transaction_id_hex)
+            self.current_BCCs[realreceiver][0] = self.current_BCCs[realreceiver][0] + transaction.amount
+            self.current_BCCs[realreceiver][1].append(transaction.transaction_id_hex)
             return True
 
         else:
@@ -258,16 +259,16 @@ class Node:
 
         somechain = []
         node_id = []
-        current_NBCs = []
-        NBCs = []
+        current_BCCs = []
+        BCCs = []
         vt = []
         for r in self.ring:
             baseurl = 'http://{}:{}/'.format(r['ip'],r['port'])
             res = requests.get(baseurl + "Chain").json()
             somechain.append(jsonpickle.decode(res["chain"]))
             node_id.append(res["id"])
-            current_NBCs.append(res["current_NBCs"])
-            NBCs.append(res["NBCs"])
+            current_BCCs.append(res["current_BCCs"])
+            BCCs.append(res["BCCs"])
             vt.append(jsonpickle.decode(res["VT"]))
         maxlen = len(somechain[0].chain)
         for i in range(len(somechain)):
@@ -288,7 +289,7 @@ class Node:
 
         if(changed):
             self.chain = somechain[k]
-            self.current_NBCs = current_NBCs[k]
-            self.NBCs = NBCs[k]
+            self.current_BCCs = current_BCCs[k]
+            self.BCCs = BCCs[k]
             self.validated_transactions = vt[k]
         return
