@@ -13,37 +13,36 @@
 import time
 import Crypto
 import Crypto.Random
-from Crypto.Hash import SHA
+from Crypto.Hash import SHA, SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 
 
-def makeRSAjsonSendable(rsa):                            #????
+def makeRSAjsonSendable(rsa):  # ????
     return rsa.exportKey("PEM").decode('ascii')
 
 
-def makejsonSendableRSA(jsonSendable):                  #????
+def makejsonSendableRSA(jsonSendable):  # ????
     return RSA.importKey(jsonSendable.encode('ascii'))
 
 
 class Transaction:
 
-    def __init__(self, sender_address, sender_private_key, recipient_address, value, reals=None, realr=None):
+    def __init__(self, sender_address, sender_private_key, recipient_address, transaction_type, amount, nonce, message,
+                 reals=None, realr=None):
 
         self.sender_address = sender_address
         self.receiver_address = recipient_address
-        # type of transaction
-        self.amount = value
-        # message
-        # nonce
-        self.rand = Crypto.Random.get_random_bytes(10)
-        self.transaction_id = SHA.new(
-            (str(sender_address) + str(recipient_address) + str(value) + str(self.rand)).encode())
-        self.signature = None
-        if not type(self.sender_address) == type(0):
-            self.signature = self.sign_transaction(sender_private_key)  # ?????
+        self.transaction_type = transaction_type
+        self.amount = amount
+        self.message = message
+        self.nonce = nonce
+
+        self.signature = None   # na paroume periptwsh gia bootstrap node poy tote 8a exoyme validator=0
+        self.transaction_id = self.calculate_transaction_id()
 
         # helpers?????
+        self.rand = Crypto.Random.get_random_bytes(10)
         self.transaction_myid = str(sender_address) + str(recipient_address) + str(value) + str(self.rand)
         self.reals = reals
         self.realr = realr
@@ -52,6 +51,19 @@ class Transaction:
         self.transaction_id_hex = self.transaction_id.hexdigest()
         self.timeCreated = time.time()
         self.timeAdded = None
+
+    def calculate_transaction_id(self):
+        transaction_content = (f"{self.sender_address}{self.receiver_address}{self.amount}{self.message}"
+                               f"{self.transaction_type}{self.nonce}")
+        return SHA256.new(transaction_content.encode('utf-8')).hexdigest()   # hexdigest?????
+
+        # self.transaction_id = SHA.new(
+        #     (str(sender_address) + str(recipient_address) + str(value) + str(self.rand)).encode())
+        # self.signature = None
+        # if not type(self.sender_address) == type(0):
+        #     self.signature = self.sign_transaction(sender_private_key)  # ?????
+
+
 
     def sign_transaction(self, private_key):
         """
