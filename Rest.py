@@ -34,17 +34,16 @@ def home():
 
 
 if __name__ == '__main__':
-    ip_address = sys.argv[1]
+    port = sys.argv[1]
     if len(sys.argv) > 1:
-        print("Hello my IP Address:", ip_address)
+        print("Hello my port is:", port)
     else:
-        print("No IP address was provided.")
+        print("No port was provided.")
 
     # from argparse import ArgumentParser
     # node = Node()
     #
-    # baseurl = 'http://{}:{}/'.format("192.168.1.5","5000")
-    # host = '192.168.1.4'
-    # port = 5000
+    #baseurl = 'http://{}:{}/'.format("192.168.1.5", "5000")
+    host = '127.0.0.1'
     # ContactBootstrapNode(baseurl, host, port)
-    app.run(host=ip_address, port=5000, debug=True)
+    app.run(host=host, port=int(port), debug=True)
