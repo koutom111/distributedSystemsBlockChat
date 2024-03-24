@@ -64,7 +64,7 @@ class Node:
     def create_wallet(self):
         self.wallet = Wallet()
 
-    def create_transaction(self, sender, sender_private_key, receiver, amount):
+    def create_transaction(self, sender, sender_private_key, receiver, amount, nonce, message):
         realsender = None
         realreceiver = None
         if (DEBUG):
@@ -112,7 +112,7 @@ class Node:
                         realreceiver = self.id
                 except:
                     pass
-        transaction = Transaction(sender, sender_private_key, receiver, amount, reals=realsender, realr=realreceiver)
+        transaction = Transaction(sender, sender_private_key, receiver, amount, nonce, message, reals=realsender, realr=realreceiver)
 
         if (not realsender == "genesis"):
             transaction.transaction_inputs = self.current_BCCs[realsender][1]
