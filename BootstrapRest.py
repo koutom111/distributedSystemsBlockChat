@@ -28,30 +28,22 @@ app = Flask(__name__)
 CORS(app)
 
 
+@app.route('/nodes/register', methods=['POST'])
+def register_nodes():
+    if request is None:
+        return "Error: Please supply a valid Node", 400
+    data = request.json
+    if data is None:
+        return "Error: Please supply a valid Node", 400
+    print(f"Port number {data['port']} is here")
+    return "Node is here", 200
+
+
 @app.route('/')
 def home():
-    return 'Hello, World!'
-
-
-def ContactBootstrapNode(baseurl, host, port):
-    load = {'port': port}
-    r = requests.post(baseurl + "nodes/register", json=load)
-    if (not r.status_code == 200):
-        exit(1)
-    print("Successfully registered")
+    return 'Hello, Bootstrap is here!'
 
 
 if __name__ == '__main__':
-    port = sys.argv[1]
-    if len(sys.argv) > 1:
-        print("Hello my port is:", port)
-    else:
-        print("No port was provided.")
-
-    # from argparse import ArgumentParser
-    # node = Node()
-    #
-    baseurl = 'http://{}:{}/'.format("127.0.0.1", "5000")
     host = '127.0.0.1'
-    ContactBootstrapNode(baseurl, host, port)
-    app.run(host=host, port=int(port), debug=True)
+    app.run(host=host, port=5000, debug=True)
