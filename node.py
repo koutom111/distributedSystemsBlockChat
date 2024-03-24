@@ -1,13 +1,16 @@
 #   chain: το blockchain ως τωρα,   -
 # BCCs - currentBCCs ???? διαφορά ??? -
 # wallet: public - private key  -
-# ring: λίστα με τα IPs ολων των nodes
+# ring: λίστα με τα IPs ολων των nodes και pub keys
 # current_block: το hash του current block ???
 # previous_block: το hash του προηγούμενου block στο blockchain ???
 # myip: το IP του node
 # myport: το port του node
 # completed_transactions : vlepoume an to theloume
 # validated_transactions : vlepoume an to theloume
+# nonce : μετρητής transactions
+# state : λίστα με τους υπάρχοντες λογαριασμούς και τα υπόλοιπά τους
+# staking : για το proof-of-state
 from block import Block
 from wallet import Wallet
 from transaction import Transaction
@@ -51,6 +54,9 @@ class Node:
         self.completed_transactions = []
         self.validated_transactions = []
         self.all_lock = threading.Lock()
+        self.nonce = 0 #DIKO MAS
+        self.state = [] #DIKO MAS
+        self.staking =0 #DIKO MAS
 
     def create_new_block(self, index, previousHash_hex, nonce, timestamp, difficulty, capacity):
         return Block(index, previousHash_hex, nonce, timestamp, difficulty, capacity)
