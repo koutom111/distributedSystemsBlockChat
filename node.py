@@ -23,7 +23,7 @@ import requests
 from _thread import *
 import threading
 
-DEBUG = True
+DEBUG = False
 PRINTCHAIN = False
 
 
@@ -58,13 +58,13 @@ class Node:
         self.state = [] #DIKO MAS
         self.staking =0 #DIKO MAS
 
-    def create_new_block(self, index, previousHash_hex, nonce, timestamp, difficulty, capacity):
-        return Block(index, previousHash_hex, nonce, timestamp, difficulty, capacity)
+    def create_new_block(self, index, previousHash_hex, nonce, timestamp, capacity):
+        return Block(index, previousHash_hex, nonce, timestamp, capacity)
 
     def create_wallet(self):
         self.wallet = Wallet()
 
-    def create_transaction(self, sender, sender_private_key, receiver, amount, nonce, message):
+    def create_transaction(self, sender, sender_private_key, receiver, transaction_type, amount, nonce, message):
         realsender = None
         realreceiver = None
         if (DEBUG):
@@ -112,27 +112,27 @@ class Node:
                         realreceiver = self.id
                 except:
                     pass
-        transaction = Transaction(sender, sender_private_key, receiver, amount, nonce, message, reals=realsender, realr=realreceiver)
+        transaction = Transaction(sender, sender_private_key, receiver, transaction_type, amount, nonce, message, reals=realsender, realr=realreceiver)
 
-        if (not realsender == "genesis"):
-            transaction.transaction_inputs = self.current_BCCs[realsender][1]
+        # if (not realsender == "genesis"):
+        #     transaction.transaction_inputs = self.current_BCCs[realsender][1]
+        #
+        #     output_id1 = transaction.transaction_id_hex + 'a'
+        #     output1 = [output_id1, transaction.transaction_id_hex, int(realreceiver), amount]
+        #     transaction.transaction_outputs.append(output1)
+        #
+        #     output_id2 = transaction.transaction_id_hex + 'b'
+        #     output2 = [output_id2, transaction.transaction_id_hex, int(realsender),
+        #                self.current_BCCs[int(realsender)][0] - amount]
+        #     transaction.transaction_outputs.append(output2)
+        #
+        # if (transaction.signature):
+        #     transactionjson = jsonpickle.encode(transaction)
+        #     baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
+        #     res = requests.post(baseurl + "ValidateTransaction", json={'transaction': transactionjson})
 
-            output_id1 = transaction.transaction_id_hex + 'a'
-            output1 = [output_id1, transaction.transaction_id_hex, int(realreceiver), amount]
-            transaction.transaction_outputs.append(output1)
-
-            output_id2 = transaction.transaction_id_hex + 'b'
-            output2 = [output_id2, transaction.transaction_id_hex, int(realsender),
-                       self.current_BCCs[int(realsender)][0] - amount]
-            transaction.transaction_outputs.append(output2)
-
-        if (transaction.signature):
-            transactionjson = jsonpickle.encode(transaction)
-            baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
-            res = requests.post(baseurl + "ValidateTransaction", json={'transaction': transactionjson})
-
-        for r in self.ring:
-            start_new_thread(self.broadcast_transaction, (transaction, r,))
+        # for r in self.ring:
+        #     start_new_thread(self.broadcast_transaction, (transaction, r,))
         return transaction
 
     def broadcast_transaction(self, transaction, r):

@@ -39,16 +39,16 @@ class Transaction:
         self.nonce = nonce
 
         self.signature = None   # na paroume periptwsh gia bootstrap node poy tote 8a exoyme validator=0
-        self.transaction_id = self.calculate_transaction_id()
+        self.transaction_id_hex = self.calculate_transaction_id()
 
         # helpers?????
         self.rand = Crypto.Random.get_random_bytes(10)
-        self.transaction_myid = str(sender_address) + str(recipient_address) + str(value) + str(self.rand)
+        self.transaction_myid = str(sender_address) + str(recipient_address) + str(amount) + str(self.rand)
         self.reals = reals
         self.realr = realr
         self.transaction_inputs = []
         self.transaction_outputs = []
-        self.transaction_id_hex = self.transaction_id.hexdigest()
+        #self.transaction_id_hex = self.transaction_id.hexdigest()
         self.timeCreated = time.time()
         self.timeAdded = None
 

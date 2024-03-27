@@ -13,6 +13,7 @@ import json
 import sys, os
 import time
 import jsonpickle
+import pickle
 import Crypto
 import Crypto.Random
 from Crypto.Hash import SHA
@@ -24,13 +25,21 @@ PRINTCHAIN = False
 # CLIENT = 1                                    # read transactions from noobcash client
 CLIENT = 0  # read transactions from txt
 
-app = Flask(_name_)
+app = Flask(__name__)
 CORS(app)
+
+
+def makeRSAjsonSendable(rsa):
+    return rsa.exportKey("PEM").decode('ascii')
+
+
+def makejsonSendableRSA(jsonSendable):
+    return RSA.importKey(jsonSendable.encode('ascii'))
 
 
 #######################  marika      ################################
 
-def read_transaction():    #na balw to cli script
+def read_transaction():  # na balw to cli script
     if (CLIENT):
         print("****** Welcome to Noobcash Client . . . ******")
         while (True):
@@ -101,6 +110,7 @@ def FirstBroadcast(ring):
         resRing = requests.post(baseurl + "UpdateRing", json=load)
     start_new_thread(read_transaction, ())
 
+
 def MakeFirstTransaction(pk, ip, port):
     amount = 100
     baseurl = 'http://{}:{}/'.format(ip, port)
@@ -135,14 +145,14 @@ def home():
     return 'Hello, Bootstrap is here!'
 
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     host = '127.0.0.1'
     port = 5000
     BLOCK_CAPACITY = 10
     N = 5  # Number of nodes i  the system
     blockchain = Blockchain()
 
-    manager = Manager()                  #????? to 8eloyme???????
+    manager = Manager()  # ????? to 8eloyme???????
 
     BootstrapDict = manager.dict()
     nodeCount = 1
@@ -150,86 +160,36 @@ if _name_ == '_main_':
 
     node = Node()
     node.id = 0
-    node.myip = host                             # '192.168.1.5'
+    node.myip = host  # '192.168.1.5'
     node.myport = port
 
     bootstrap_public_key = node.wallet.public_key
 
     BootstrapDict['nodeCount'] = nodeCount
-    BootstrapDict['bootstrap_public_key'] = bootstrap_public_key
+    BootstrapDict['bootstrap_public_key'] = makeRSAjsonSendable(bootstrap_public_key)
     BootstrapDict['N'] = N
 
+    print(BootstrapDict)
+
     # create genesis block
-    genesis_block = node.create_new_block(0, 1, 0, time.time(), MINING_DIFFICULTY,
+    genesis_block = node.create_new_block(0, 1, 0, time.time(),
                                           BLOCK_CAPACITY)  # index = 0, previousHash = 1, nonce = 0, capacity = BLOCK_CAPACITY
     node.current_block = genesis_block
+    print(genesis_block.printMe())
     # first transaction
-    amount = 100 * N
-    first_transaction = node.create_transaction(0, None, bootstrap_public_key, amount)
-    #vale mono ayto to 1o transaction sto genesis block
+    amount = 1000 * N
+    first_transaction = node.create_transaction(0, None, bootstrap_public_key,
+                                                'payment', amount, 1, 'First Transaction')
+    # vale mono ayto to 1o transaction sto genesis block
+    print(f'First Transaction:{first_transaction.printMe()}')
     genesis_block.add_transaction(first_transaction)
+    print(f'Genesis block after first transaction: {genesis_block.printMe()}')
     # vale to genesis block sto blockchain kai ftiaxe neo block gia na einai to current block
     blockchain.add_block_to_chain(genesis_block)
     node.chain = blockchain
     node.previous_block = None
-    node.current_block = node.create_new_block(1, genesis_block.currentHash_hex, 0, time.time(), MINING_DIFFICULTY,
+    node.current_block = node.create_new_block(1, genesis_block.currentHash_hex, 0, time.time(),
                                                BLOCK_CAPACITY)
-    #jekina
+    # jekina
     app.run(host=host, port=port, debug=True)
 
-###################################################### ths marikas apla gia anafora###################3
-
-if _name_ == '_main_':
-    from argparse import ArgumentParser
-
-    BLOCK_CAPACITY = 10
-    #MINING_DIFFICULTY = 4
-    N = 5  # Number of nodes i  the system
-
-    blockchain = Blockchain()
-
-    parser = ArgumentParser()
-    parser.add_argument('-p', '--port', default=5000, type=int, help='port to listen on')
-    args = parser.parse_args()
-    port = args.port
-
-    manager = Manager()
-
-    BootstrapDict = manager.dict()
-    nodeCount = 1
-    bootstrap_public_key = ""
-
-    # create bootstrap node
-    node = Node()
-    node.id = 0
-    node.myip = '192.168.1.5'
-    node.myport = port
-
-    bootstrap_public_key = node.wallet.public_key
-
-    BootstrapDict['nodeCount'] = nodeCount
-    BootstrapDict['bootstrap_public_key'] = bootstrap_public_key
-    BootstrapDict['N'] = N
-    # create genesis block
-    genesis_block = node.create_new_block(0, 1, 0, time.time(), MINING_DIFFICULTY,
-                                          BLOCK_CAPACITY)  # index = 0, previousHash = 1, nonce = 0, capacity = BLOCK_CAPACITY
-    node.current_block = genesis_block
-    # first transaction
-    amount = 100 * N
-    first_transaction = node.create_transaction(0, None, bootstrap_public_key, amount)
-    genesis_block.add_transaction(first_transaction)
-    blockchain.add_block_to_chain(genesis_block)
-    node.chain = blockchain
-    node.previous_block = None
-    node.current_block = node.create_new_block(1, genesis_block.currentHash_hex, 0, time.time(), MINING_DIFFICULTY,
-                                               BLOCK_CAPACITY)
-
-    inputs = []
-    inputs.append(first_transaction.transaction_id_hex)
-    node.NBCs.append([first_transaction.amount, inputs])
-    node.current_NBCs.append([first_transaction.amount, inputs])
-    for i in range(1, N):
-        node.NBCs.append([0, []])
-    for i in range(1, N):
-        node.current_NBCs.append([0, []])
-    app.run(host='192.168.1.5', port=port, debug=False, use_reloader=False)

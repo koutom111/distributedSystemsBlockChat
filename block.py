@@ -14,15 +14,16 @@ import time
 
 
 class Block:
-    def __init__(self, index, previousHash_hex, nonce, timestamp, difficulty, capacity):
+    def __init__(self, index, previousHash_hex, nonce, timestamp, capacity):
         self.index = index
         self.timestamp = timestamp
         self.listOfTransactions = []
         # validator
-        self.currentHash = SHA.new(
-            (str(self.index) + str(self.previousHash_hex) + str(self.nonce)).encode())  # ti kanoume me to nonce
-        self.currentHash_hex = self.currentHash.hexdigest()
         self.previousHash_hex = previousHash_hex
+        self.currentHash = SHA.new(
+            (str(self.index) + str(self.previousHash_hex) + str(nonce)).encode())  # ti kanoume me to nonce????????????
+        self.currentHash_hex = self.currentHash.hexdigest()
+
 
         self.capacity = capacity
 
@@ -30,7 +31,7 @@ class Block:
 
         self.timeCreated = time.time()  # axrista????
         self.timeAdded = None  # axrista????
-        self.difficulty = difficulty  # axrista????
+        #self.difficulty = difficulty  # axrista????
         self.lock = threading.Lock()
 
     # The __eq__ function in Python is a method for defining how instances of a class should be compared for equality.
