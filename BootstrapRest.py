@@ -20,6 +20,8 @@ from Crypto.Hash import SHA
 from Crypto.PublicKey import RSA
 from copy import deepcopy
 from Crypto.Signature import PKCS1_v1_5
+import base64
+
 
 PRINTCHAIN = False
 # CLIENT = 1                                    # read transactions from noobcash client
@@ -111,8 +113,8 @@ def FirstBroadcast(ring):
     start_new_thread(read_transaction, ())
 
 
-def MakeFirstTransaction(pk, ip, port):
-    amount = 100
+def MakeFirstTransaction(pub_key, ip, port):
+    amount = 1000
     baseurl = 'http://{}:{}/'.format(ip, port)
     while (True):
         try:
@@ -122,8 +124,12 @@ def MakeFirstTransaction(pk, ip, port):
             time.sleep(0.1)
         else:
             break
-    transaction = node.create_transaction(bootstrap_public_key, node.wallet.private_key, pk, amount)
-    return
+    transaction = node.create_transaction(bootstrap_public_key, node.wallet.private_key, pub_key,
+                                          'payment', amount, 2,
+                                          'your first money')  # ayto to node einai to bootstap se ayto to script
+    # ti kanoyme me to nonce?? pros to paron to bazw 2
+    transaction.printMe()
+    return transaction
 
 
 ######################################################
@@ -136,8 +142,50 @@ def register_nodes():
     data = request.json
     if data is None:
         return "Error: Please supply a valid Node", 400
+    if (BootstrapDict['nodeCount'] >= BootstrapDict['N']):
+        return "Error: System is full", 405
+
+    lock = Lock()
+    lock.acquire()
+    BootstrapDict['nodeCount'] += 1
+    BootstrapDictInstance = BootstrapDict.copy()
+    lock.release()
+
+    print(BootstrapDictInstance)
+    print(makejsonSendableRSA(BootstrapDictInstance['bootstrap_public_key']))
+
+    print()
+    print()
+    print(node.current_block.listOfTransactions)
+    print(json.dumps(node.current_block.to_dict()))
+    print()
+
+    node.ring.append({'id': BootstrapDictInstance['nodeCount'] - 1, 'ip': data['ip'], 'port': data['port'],
+                      'public_key': data['public_key'], 'balance': 0})  # na ftiajv to load poy erxete apo to Rest.py
+
+    # if (BootstrapDict['nodeCount'] == BootstrapDict['N']):
+    #     start_new_thread(FirstBroadcast, (node.ring,))      #8elei ftiajimo
+
+    # serialized_blockchain = pickle.dumps(blockchain)  # logika ayto 88a exei 8ema
+    # serialized_blockchain_b64 = base64.b64encode(serialized_blockchain).decode('utf-8')
+
+    start_new_thread(MakeFirstTransaction, (data['public_key'], data['ip'], data['port'],))
+    print(f"Node:{node.id} BCCs: {node.BCCs}")
+    print(f"Node: {node.id} Current BCCs: {node.current_BCCs}")
     print(f"Port number {data['port']} is here")
-    return "Node is here", 200
+    response = jsonify({'id': BootstrapDictInstance['nodeCount'],
+                        'bootstrap_public_key': BootstrapDictInstance['bootstrap_public_key'],
+                        #'blockchain': serialized_blockchain_b64,
+                        'block_capacity': BLOCK_CAPACITY,
+                        'start_ring': {'id': 0, 'ip': '192.168.1.5', 'port': '5000',
+                                       'public_key': BootstrapDictInstance['bootstrap_public_key'],
+                                       'balance': 0},
+                        'current_block': json.dumps(node.current_block.to_dict()),
+                        'BCCs': node.BCCs,
+                        'current_BCCs': node.current_BCCs})
+
+    print(f"Response : {response.json}")
+    return response
 
 
 @app.route('/')
@@ -187,9 +235,9 @@ if __name__ == '__main__':
     # vale to genesis block sto blockchain kai ftiaxe neo block gia na einai to current block
     blockchain.add_block_to_chain(genesis_block)
     node.chain = blockchain
+    print(node.chain.printMe())
     node.previous_block = None
     node.current_block = node.create_new_block(1, genesis_block.currentHash_hex, 0, time.time(),
                                                BLOCK_CAPACITY)
     # jekina
     app.run(host=host, port=port, debug=True)
-

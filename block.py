@@ -35,6 +35,33 @@ class Block:
         self.lock = threading.Lock()
 
     # The __eq__ function in Python is a method for defining how instances of a class should be compared for equality.
+    def to_dict(self):
+        """Converts the block into a dictionary for easier serialization."""
+        return {
+            'index': self.index,
+            'timestamp': self.timestamp,
+            'listOfTransactions': [t.to_dict() for t in self.listOfTransactions],
+            # Assuming Transaction has a to_dict method
+            'previousHash_hex': self.previousHash_hex,
+            'currentHash_hex': self.currentHash_hex,
+            'capacity': self.capacity,
+            # Exclude non-serializable fields like 'lock'
+        }
+
+    def block_from_dict(block_dict):     ## mallon einai lathos
+        """Recreates a Block instance from a dictionary."""
+        block = Block(
+            block_dict['index'],
+            block_dict['previousHash_hex'],
+            block_dict.  # Provide default value if nonce isn't stored
+            block_dict['timestamp'],
+            block_dict['capacity']
+        )
+        # Assuming Transaction has a from_dict method or similar
+        block.listOfTransactions = [Transaction.from_dict(t) for t in block_dict['listOfTransactions']]
+        # Reinitialize any non-serialized fields like 'lock'
+        block.lock = threading.Lock()
+        return block
     def __eq__(self, other):
         """Overrides the default implementation"""
         ret = (
