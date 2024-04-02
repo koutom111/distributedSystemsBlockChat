@@ -1,3 +1,6 @@
+import base64
+import pickle
+
 import requests
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
@@ -48,9 +51,23 @@ def ContactBootstrapNode(baseurl, host, port):
     if (not r.status_code == 200):
         exit(1)
     rejson = r.json()
+    # Deserialize the blockchain received from the server
+    serialized_blockchain_b64 = rejson['blockchain']
+    serialized_blockchain = base64.b64decode(serialized_blockchain_b64)
+    blockchain = pickle.loads(serialized_blockchain)
+
+    blockchain_dict = []
+    for block in blockchain.chain:
+        blockchain_dict.append(block.to_dict())
+
+    # Replace 'blockchain' field with the deserialized blockchain data
+    rejson['blockchain'] = blockchain_dict
     print(rejson)
     bootstrap_public_key = makejsonSendableRSA(rejson["bootstrap_public_key"])
-    print(bootstrap_public_key)
+    print(bootstrap_public_key)  # ektypwnei address epeidh einai RSA
+    # an theloume na ektypwsoyme to kleidi:
+    # test = makeRSAjsonSendable(bootstrap_public_key)
+    # print(test)
     print("Successfully registered")
 
 

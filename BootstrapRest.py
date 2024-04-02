@@ -166,8 +166,17 @@ def register_nodes():
     # if (BootstrapDict['nodeCount'] == BootstrapDict['N']):
     #     start_new_thread(FirstBroadcast, (node.ring,))      #8elei ftiajimo
 
-    # serialized_blockchain = pickle.dumps(blockchain)  # logika ayto 88a exei 8ema
-    # serialized_blockchain_b64 = base64.b64encode(serialized_blockchain).decode('utf-8')
+    serialized_blockchain = pickle.dumps(blockchain)  # logika ayto 88a exei 8ema
+    serialized_blockchain_b64 = base64.b64encode(serialized_blockchain).decode('utf-8')
+    # GIA NA TSEKARW AN DOYLEVEI TO SERIALIZATION/DESERIALIZATION
+    # # Deserialize the serialized data
+    # deserialized_blockchain = pickle.loads(serialized_blockchain)
+    #
+    # # Ensure that the deserialized object matches the original blockchain object
+    # if deserialized_blockchain.chain == blockchain.chain:
+    #     print("Serialization and deserialization successful!")
+    # else:
+    #     print("Serialization or deserialization failed.")
 
     start_new_thread(MakeFirstTransaction, (data['public_key'], data['ip'], data['port'],))
     print(f"Node:{node.id} BCCs: {node.BCCs}")
@@ -175,7 +184,7 @@ def register_nodes():
     print(f"Port number {data['port']} is here")
     response = jsonify({'id': BootstrapDictInstance['nodeCount'],
                         'bootstrap_public_key': BootstrapDictInstance['bootstrap_public_key'],
-                        #'blockchain': serialized_blockchain_b64,
+                        'blockchain': serialized_blockchain_b64,
                         'block_capacity': BLOCK_CAPACITY,
                         'start_ring': {'id': 0, 'ip': '192.168.1.5', 'port': '5000',
                                        'public_key': BootstrapDictInstance['bootstrap_public_key'],
@@ -222,12 +231,42 @@ if __name__ == '__main__':
     # create genesis block
     genesis_block = node.create_new_block(0, 1, 0, time.time(),
                                           BLOCK_CAPACITY)  # index = 0, previousHash = 1, nonce = 0, capacity = BLOCK_CAPACITY
+
+    #TSEKARW AN TO SERIALIZATION TOY BLOCK DOYLEVEI, ALLAZEI TO LOCK EPEIDH TO KANW EXCLUDE!!! EINAI THEMA??
+    # serialized_genesis_block = pickle.dumps(genesis_block)
+    #
+    # # Deserialize the serialized data
+    # deserialized_genesis_block = pickle.loads(serialized_genesis_block)
+    #
+    # # Ensure that the deserialized object matches the original genesis_block object
+    # if deserialized_genesis_block.__dict__ == genesis_block.__dict__:
+    #     print("Serialization and deserialization successful for genesis_block object!")
+    # else:
+    #     print("Serialization or deserialization failed for genesis_block object.")
+    # print("Deserialized Genesis Block:")
+    # print(deserialized_genesis_block.__dict__)
+
+    # Print genesis_block dictionary
+    print("\nGenesis Block:")
+    print(genesis_block.__dict__)
     node.current_block = genesis_block
     print(genesis_block.printMe())
     # first transaction
     amount = 1000 * N
-    first_transaction = node.create_transaction(0, None, bootstrap_public_key,
+    BootstrapDictInstance = BootstrapDict.copy()
+    first_transaction = node.create_transaction(0, None, BootstrapDictInstance['bootstrap_public_key'],
                                                 'payment', amount, 1, 'First Transaction')
+    # TSEKARW AN TO SERIALIZATION TOY TRANSACTION DOYLEVEI, EINAI OK
+    # serialized_transaction = pickle.dumps(first_transaction)
+    #
+    # # Deserialize the pickled data
+    # deserialized_transaction = pickle.loads(serialized_transaction)
+    #
+    # # Compare attributes to ensure successful serialization and deserialization
+    # if first_transaction.__dict__ == deserialized_transaction.__dict__:
+    #     print("Serialization and deserialization successful for Transaction object!")
+    # else:
+    #     print("Serialization or deserialization failed for Transaction object.")
     # vale mono ayto to 1o transaction sto genesis block
     print(f'First Transaction:{first_transaction.printMe()}')
     genesis_block.add_transaction(first_transaction)
@@ -237,7 +276,7 @@ if __name__ == '__main__':
     node.chain = blockchain
     print(node.chain.printMe())
     node.previous_block = None
-    node.current_block = node.create_new_block(1, genesis_block.currentHash_hex, 0, time.time(),
+    node.current_block = node.create_new_block(1, genesis_block.to_dict()['currentHash_hex'], 0, time.time(),
                                                BLOCK_CAPACITY)
     # jekina
     app.run(host=host, port=port, debug=True)
