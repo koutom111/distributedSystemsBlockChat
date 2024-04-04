@@ -5,6 +5,8 @@ import requests
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from multiprocessing import Value, Array, Process, Manager, Lock
+
+from BootstrapRest import read_transaction
 from block import Block
 from node import Node
 from blockchain import Blockchain
@@ -43,6 +45,30 @@ def makejsonSendableRSA(jsonSendable):
 def home():
     return 'Hello, World!'
 
+@app.route('/Live', methods=['GET'])
+def Live():
+    return "I am alive!", 200
+@app.route('/UpdateRing', methods=['POST'])
+def UpdateRing():
+    if request is None:
+        return "Error: Please supply a valid Ring", 400
+    data = request.json
+    print("-----------------------")
+    print(data)
+    print("-----------------------")
+    if data is None:
+        return "Error: Please supply a valid Ring", 400
+    ring = list(data.values())
+    r1 = None
+    for r in ring:
+        r1 = r
+        r1['public_key'] = makejsonSendableRSA(r1['public_key'])
+    # while(not(node.current_BCCs[-1][0] == 100 or node.BCCs[-1][0] == 100)):
+    #     pass
+    # start_new_thread(read_transaction, ())
+
+    print(ring)
+    return "Ring Updated for node {}".format(node.id), 200
 
 def ContactBootstrapNode(baseurl, host, port):
     public_key = node.wallet.public_key
@@ -66,8 +92,8 @@ def ContactBootstrapNode(baseurl, host, port):
     bootstrap_public_key = makejsonSendableRSA(rejson["bootstrap_public_key"])
     print(bootstrap_public_key)  # ektypwnei address epeidh einai RSA
     # an theloume na ektypwsoyme to kleidi:
-    # test = makeRSAjsonSendable(bootstrap_public_key)
-    # print(test)
+    # kleidi = makeRSAjsonSendable(bootstrap_public_key)
+    # print(kleidi)
     print("Successfully registered")
 
 
@@ -86,4 +112,4 @@ if __name__ == '__main__':
     baseurl = 'http://{}:{}/'.format("127.0.0.1", "5000")
     host = '127.0.0.1'
     ContactBootstrapNode(baseurl, host, port)
-    app.run(host=host, port=int(port), debug=True)
+    app.run(host=host, port=int(port), debug=False, use_reloader=False)

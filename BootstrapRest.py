@@ -91,7 +91,9 @@ def FirstBroadcast(ring):
     for r in ring:
         baseurl = 'http://{}:{}/'.format(r['ip'], r['port'])
         ringWithoutSelf = {}
-
+        print("------------------------------")
+        print(r)
+        print("------------------------------")
         u = 0
         for k in ring:
             if (not k['ip'] == r['ip']):
@@ -108,9 +110,9 @@ def FirstBroadcast(ring):
                 time.sleep(0.1)
             else:
                 break
-
         resRing = requests.post(baseurl + "UpdateRing", json=load)
-    start_new_thread(read_transaction, ())
+        print(resRing)
+    # start_new_thread(read_transaction, ())
 
 
 def MakeFirstTransaction(pub_key, ip, port):
@@ -143,6 +145,7 @@ def register_nodes():
     if data is None:
         return "Error: Please supply a valid Node", 400
     if (BootstrapDict['nodeCount'] >= BootstrapDict['N']):
+        print(BootstrapDict['nodeCount'])
         return "Error: System is full", 405
 
     lock = Lock()
@@ -163,8 +166,10 @@ def register_nodes():
     node.ring.append({'id': BootstrapDictInstance['nodeCount'] - 1, 'ip': data['ip'], 'port': data['port'],
                       'public_key': data['public_key'], 'balance': 0})  # na ftiajv to load poy erxete apo to Rest.py
 
-    # if (BootstrapDict['nodeCount'] == BootstrapDict['N']):
-    #     start_new_thread(FirstBroadcast, (node.ring,))      #8elei ftiajimo
+    print("Node Count:", BootstrapDict['nodeCount'])
+    print("N:", BootstrapDict['N'])
+    if (BootstrapDict['nodeCount'] == BootstrapDict['N']):
+        start_new_thread(FirstBroadcast, (node.ring,))      #8elei ftiajimo
 
     serialized_blockchain = pickle.dumps(blockchain)  # logika ayto 88a exei 8ema
     serialized_blockchain_b64 = base64.b64encode(serialized_blockchain).decode('utf-8')
