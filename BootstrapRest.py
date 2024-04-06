@@ -91,17 +91,16 @@ def FirstBroadcast(ring):
     for r in ring:
         baseurl = 'http://{}:{}/'.format(r['ip'], r['port'])
         ringWithoutSelf = {}
-        print("------------------------------")
-        print(r)
-        print("------------------------------")
         u = 0
         for k in ring:
-            if (not k['ip'] == r['ip']):
+            if (not k['port'] == r['port']):
                 ringWithoutSelf[str(u)] = k
                 u += 1
 
         load = ringWithoutSelf
-
+        print("-------------------------")
+        print(load)
+        print("-------------------------")
         while (True):
             try:
                 r = requests.get(baseurl + "Live")
@@ -110,7 +109,9 @@ def FirstBroadcast(ring):
                 time.sleep(0.1)
             else:
                 break
-        resRing = requests.post(baseurl + "UpdateRing", json=load)
+        json_load = pickle.dumps(load)
+        serialized_load_b64 = base64.b64encode(json_load).decode('utf-8')
+        resRing = requests.post(baseurl + "UpdateRing", json=serialized_load_b64)
         print(resRing)
     # start_new_thread(read_transaction, ())
 
@@ -284,4 +285,4 @@ if __name__ == '__main__':
     node.current_block = node.create_new_block(1, genesis_block.to_dict()['currentHash_hex'], 0, time.time(),
                                                BLOCK_CAPACITY)
     # jekina
-    app.run(host=host, port=port, debug=True)
+    app.run(host=host, port=port, debug=False)

@@ -52,13 +52,17 @@ def Live():
 def UpdateRing():
     if request is None:
         return "Error: Please supply a valid Ring", 400
-    data = request.json
-    print("-----------------------")
-    print(data)
-    print("-----------------------")
+    rejson = request.json
+    # Deserialize the blockchain received from the server
+    serialized_data = base64.b64decode(rejson)
+    data = pickle.loads(serialized_data)
     if data is None:
         return "Error: Please supply a valid Ring", 400
     ring = list(data.values())
+    node.ring = ring
+    print(ring[0])
+    print("------------------------")
+    print(node.ring)
     r1 = None
     for r in ring:
         r1 = r
@@ -67,7 +71,6 @@ def UpdateRing():
     #     pass
     # start_new_thread(read_transaction, ())
 
-    print(ring)
     return "Ring Updated for node {}".format(node.id), 200
 
 def ContactBootstrapNode(baseurl, host, port):
