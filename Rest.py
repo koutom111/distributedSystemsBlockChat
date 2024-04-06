@@ -45,9 +45,12 @@ def makejsonSendableRSA(jsonSendable):
 def home():
     return 'Hello, World!'
 
+
 @app.route('/Live', methods=['GET'])
 def Live():
     return "I am alive!", 200
+
+
 @app.route('/UpdateRing', methods=['POST'])
 def UpdateRing():
     if request is None:
@@ -73,30 +76,53 @@ def UpdateRing():
 
     return "Ring Updated for node {}".format(node.id), 200
 
+
 def ContactBootstrapNode(baseurl, host, port):
     public_key = node.wallet.public_key
     load = {'public_key': makeRSAjsonSendable(public_key), 'ip': host, 'port': port}
+    # print('\n load pub key\n')
+    # print(load['public_key'])
     r = requests.post(baseurl + "nodes/register", json=load)
     if (not r.status_code == 200):
         exit(1)
     rejson = r.json()
+
     # Deserialize the blockchain received from the server
     serialized_blockchain_b64 = rejson['blockchain']
     serialized_blockchain = base64.b64decode(serialized_blockchain_b64)
     blockchain = pickle.loads(serialized_blockchain)
 
-    blockchain_dict = []
-    for block in blockchain.chain:
-        blockchain_dict.append(block.to_dict())
+    node.id = rejson['id']
+    node.chain = blockchain
+    node.block_capacity = rejson['block_capacity']
+    rejson['start_ring']['public_key'] = makejsonSendableRSA(rejson['start_ring']['public_key'])
+    node.ring.append(rejson['start_ring'])
 
-    # Replace 'blockchain' field with the deserialized blockchain data
-    rejson['blockchain'] = blockchain_dict
-    print(rejson)
-    bootstrap_public_key = makejsonSendableRSA(rejson["bootstrap_public_key"])
-    print(bootstrap_public_key)  # ektypwnei address epeidh einai RSA
+    serialized_current_block_b64 = rejson['current_block']
+    serialized_current_block = base64.b64decode(serialized_current_block_b64)
+    current_block = pickle.loads(serialized_current_block)
+
+    node.current_block = current_block
+    node.BCCs = rejson['BCCs']  # ????????????????????????????????????????????
+    node.current_BCCs = rejson['current_BCCs']  # ?????????????????????????????????????
+
+    # blockchain_dict = []
+    # for block in blockchain.chain:
+    #     blockchain_dict.append(block.to_dict())
+    #
+    # # Replace 'blockchain' field with the deserialized blockchain data
+    # rejson['blockchain'] = blockchain_dict
+    # print('\nBlockchain after to_dict\n')
+    # print(rejson['blockchain'])
+
+    bootstrap_public_key = makejsonSendableRSA(rejson["bootstrap_public_key"])  # ti to 8eloyme????
+
+    # print(bootstrap_public_key)  # ektypwnei address epeidh einai RSA
     # an theloume na ektypwsoyme to kleidi:
     # kleidi = makeRSAjsonSendable(bootstrap_public_key)
     # print(kleidi)
+
+    print(node.current_block.printMe())
     print("Successfully registered")
 
 
