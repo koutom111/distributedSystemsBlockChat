@@ -142,6 +142,8 @@ def register_nodes():
     if request is None:
         return "Error: Please supply a valid Node", 400
     data = request.json
+    # print('\n load pub key\n')
+    # print(data['public_key'])
     if data is None:
         return "Error: Please supply a valid Node", 400
     if (BootstrapDict['nodeCount'] >= BootstrapDict['N']):
@@ -154,22 +156,27 @@ def register_nodes():
     BootstrapDictInstance = BootstrapDict.copy()
     lock.release()
 
-    print(BootstrapDictInstance)
-    print(makejsonSendableRSA(BootstrapDictInstance['bootstrap_public_key']))
-
-    print()
-    print()
-    print(node.current_block.listOfTransactions)
-    print(json.dumps(node.current_block.to_dict()))
-    print()
+    # print(BootstrapDictInstance)
+    # print(makejsonSendableRSA(BootstrapDictInstance['bootstrap_public_key']))
+    #
+    # print()
+    # print()
+    # print(node.current_block.listOfTransactions)
+    # print(json.dumps(node.current_block.to_dict()))
+    # print()
 
     node.ring.append({'id': BootstrapDictInstance['nodeCount'] - 1, 'ip': data['ip'], 'port': data['port'],
                       'public_key': data['public_key'], 'balance': 0})  # na ftiajv to load poy erxete apo to Rest.py
 
-    print("Node Count:", BootstrapDict['nodeCount'])
-    print("N:", BootstrapDict['N'])
+    # print("Node Count:", BootstrapDict['nodeCount'])
+    # print("N:", BootstrapDict['N'])
     if (BootstrapDict['nodeCount'] == BootstrapDict['N']):
         start_new_thread(FirstBroadcast, (node.ring,))      #8elei ftiajimo
+
+    print('\nBlockchain\n')
+    print(blockchain.printMe())
+    print('\nNode.chain\n')
+    print(node.chain)
 
     serialized_blockchain = pickle.dumps(blockchain)  # logika ayto 88a exei 8ema
     serialized_blockchain_b64 = base64.b64encode(serialized_blockchain).decode('utf-8')
@@ -187,14 +194,18 @@ def register_nodes():
     print(f"Node:{node.id} BCCs: {node.BCCs}")
     print(f"Node: {node.id} Current BCCs: {node.current_BCCs}")
     print(f"Port number {data['port']} is here")
+
+    current_block_pickled = pickle.dumps(node.current_block)
+    serialized_current_block_b64 = base64.b64encode(current_block_pickled).decode('utf-8')
+
     response = jsonify({'id': BootstrapDictInstance['nodeCount'],
                         'bootstrap_public_key': BootstrapDictInstance['bootstrap_public_key'],
                         'blockchain': serialized_blockchain_b64,
                         'block_capacity': BLOCK_CAPACITY,
-                        'start_ring': {'id': 0, 'ip': '192.168.1.5', 'port': '5000',
+                        'start_ring': {'id': 0, 'ip': '192.168.1.5', 'port': '5000',             # to be fixed for OUR bootstrap!!!
                                        'public_key': BootstrapDictInstance['bootstrap_public_key'],
                                        'balance': 0},
-                        'current_block': json.dumps(node.current_block.to_dict()),
+                        'current_block': serialized_current_block_b64,
                         'BCCs': node.BCCs,
                         'current_BCCs': node.current_BCCs})
 
@@ -231,7 +242,7 @@ if __name__ == '__main__':
     BootstrapDict['bootstrap_public_key'] = makeRSAjsonSendable(bootstrap_public_key)
     BootstrapDict['N'] = N
 
-    print(BootstrapDict)
+    #print(BootstrapDict)
 
     # create genesis block
     genesis_block = node.create_new_block(0, 1, 0, time.time(),
@@ -251,11 +262,14 @@ if __name__ == '__main__':
     # print("Deserialized Genesis Block:")
     # print(deserialized_genesis_block.__dict__)
 
-    # Print genesis_block dictionary
-    print("\nGenesis Block:")
-    print(genesis_block.__dict__)
+    # # Print genesis_block dictionary
+    # print("\nGenesis Block:")
+    # print(genesis_block.__dict__)
+    # print(genesis_block)
+
     node.current_block = genesis_block
-    print(genesis_block.printMe())
+
+    # print(genesis_block.printMe())
     # first transaction
     amount = 1000 * N
     BootstrapDictInstance = BootstrapDict.copy()
@@ -273,15 +287,22 @@ if __name__ == '__main__':
     # else:
     #     print("Serialization or deserialization failed for Transaction object.")
     # vale mono ayto to 1o transaction sto genesis block
-    print(f'First Transaction:{first_transaction.printMe()}')
+
+    # print('\nFirst Transaction:\n')
+    # print(f'{first_transaction.printMe()}')
+
     genesis_block.add_transaction(first_transaction)
-    print(f'Genesis block after first transaction: {genesis_block.printMe()}')
+
+    # print('\nGenesis block after first transaction: \n')
+    # print(f'{genesis_block.printMe()}')
     # vale to genesis block sto blockchain kai ftiaxe neo block gia na einai to current block
     blockchain.add_block_to_chain(genesis_block)
     node.chain = blockchain
     print(node.chain.printMe())
     node.previous_block = None
-    node.current_block = node.create_new_block(1, genesis_block.to_dict()['currentHash_hex'], 0, time.time(),
+    node.current_block = node.create_new_block(1, genesis_block.compute_current_hash(), 0, time.time(),
                                                BLOCK_CAPACITY)
     # jekina
-    app.run(host=host, port=port, debug=True)
+    print('\nNew Block:\n')
+    print(f'{node.current_block.printMe()}')
+    app.run(host=host, port=port, debug=False)
