@@ -58,8 +58,8 @@ class Node:
         self.state = [] #DIKO MAS
         self.staking =0 #DIKO MAS
 
-    def create_new_block(self, index, previousHash_hex, nonce, timestamp, capacity, validator):
-        return Block(index, previousHash_hex, nonce, timestamp, capacity, validator)
+    def create_new_block(self, index, previousHash_hex, timestamp, capacity, validator):
+        return Block(index, previousHash_hex, timestamp, capacity, validator)
 
     def create_wallet(self):
         self.wallet = Wallet()
@@ -244,7 +244,7 @@ class Node:
         res = requests.post(baseurl + "AddBlock", json={'block': blockjson})
 
     def validate_block(self, block):
-        if (block.previousHash_hex == 1 and block.nonce == 0):
+        if (block.previousHash_hex == 1 and block.validator == 0):
             return True
         if (block.previousHash_hex == self.chain.chain[-1].compute_current_hash()):
             return True

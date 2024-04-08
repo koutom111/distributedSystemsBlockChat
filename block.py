@@ -13,13 +13,12 @@ import jsonpickle
 from Crypto.Hash import SHA
 
 class Block:
-    def __init__(self, index, previousHash_hex, nonce, timestamp, capacity, validator):
+    def __init__(self, index, previousHash_hex, timestamp, capacity, validator):
         self.index = index
         self.timestamp = timestamp
         self.listOfTransactions = []
         self.previousHash_hex = previousHash_hex
         self.capacity = capacity
-        self.nonce = nonce
         self.timeCreated = time.time()
         self.timeAdded = None
         self.validator = validator
@@ -36,7 +35,7 @@ class Block:
 
     def compute_current_hash(self):
         return SHA.new(
-            (str(self.index) + str(self.previousHash_hex) + str(self.nonce)).encode()
+            (str(self.index) + str(self.previousHash_hex)).encode()
         ).hexdigest()
 
     # def to_dict(self):
@@ -65,8 +64,8 @@ class Block:
         return ret
 
     # ti kanoume me to nonce
-    def myHash(self, nonce):
-        return SHA.new((str(self.index) + str(self.previousHash_hex) + str(self.nonce)).encode())
+    def myHash(self):
+        return SHA.new((str(self.index) + str(self.previousHash_hex)).encode())
 
     #  helpers?
     def add_transaction(self, transaction):
