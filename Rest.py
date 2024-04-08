@@ -62,14 +62,14 @@ def UpdateRing():
     if data is None:
         return "Error: Please supply a valid Ring", 400
     ring = list(data.values())
-    node.ring = ring
-    print(ring[0])
-    print("------------------------")
-    print(node.ring)
-    r1 = None
     for r in ring:
         r1 = r
         r1['public_key'] = makejsonSendableRSA(r1['public_key'])
+    node.ring.append(ring)
+    # print(ring)
+    print("------------------------")
+    print(node.ring)
+
     # while(not(node.current_BCCs[-1][0] == 100 or node.BCCs[-1][0] == 100)):
     #     pass
     # start_new_thread(read_transaction, ())
@@ -92,6 +92,10 @@ def ContactBootstrapNode(baseurl, host, port):
     serialized_blockchain = base64.b64decode(serialized_blockchain_b64)
     blockchain = pickle.loads(serialized_blockchain)
 
+    if node.validate_chain(blockchain):
+        print("Blockchain is valid.")
+    else:
+        print("Blockchain is invalid.")
     node.id = rejson['id']
     node.chain = blockchain
     node.block_capacity = rejson['block_capacity']

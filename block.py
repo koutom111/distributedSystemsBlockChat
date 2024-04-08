@@ -13,7 +13,7 @@ import jsonpickle
 from Crypto.Hash import SHA
 
 class Block:
-    def __init__(self, index, previousHash_hex, nonce, timestamp, capacity):
+    def __init__(self, index, previousHash_hex, nonce, timestamp, capacity, validator):
         self.index = index
         self.timestamp = timestamp
         self.listOfTransactions = []
@@ -22,6 +22,7 @@ class Block:
         self.nonce = nonce
         self.timeCreated = time.time()
         self.timeAdded = None
+        self.validator = validator
         self.lock = threading.Lock()
 
     def __getstate__(self):
