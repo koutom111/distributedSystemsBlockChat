@@ -11,6 +11,8 @@
 # nonce : μετρητής transactions
 # state : λίστα με τους υπάρχοντες λογαριασμούς και τα υπόλοιπά τους
 # staking : για το proof-of-state
+import random
+
 from block import Block
 from wallet import Wallet
 from transaction import Transaction
@@ -57,6 +59,7 @@ class Node:
         self.nonce = 0 #DIKO MAS
         self.state = [] #DIKO MAS
         self.staking =0 #DIKO MAS
+        self.winner = None #HELPER FOR VALIDATION
 
     def create_new_block(self, index, previousHash_hex, timestamp, capacity, validator):
         return Block(index, previousHash_hex, timestamp, capacity, validator)
@@ -221,21 +224,36 @@ class Node:
                 pass
         return 1
 
-    def mine_block(self):
-        self.current_block.nonce = 0
-        while (not (self.current_block.myHash(self.current_block.nonce).hexdigest().startswith(
-                '0' * self.current_block.difficulty))):
-            self.current_block.nonce += 1
-            if (self.current_block.index <= self.chain.chain[-1].index):
-                return
+    def mint_block(self):
+        state = self.state
+        seed = self.chain.chain[-1].compute_current_hash()
+        total_stake = sum(node['staking'] for node in state)
 
-        baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
-        blockjson = jsonpickle.encode(self.current_block)
-        res = requests.post(baseurl + "AddBlock", json={'block': blockjson})
+        random.seed(seed)
 
-        for r in self.ring:
-            start_new_thread(self.broadcast_block, (self.current_block, r))
-        return self.current_block
+        # Check if all stakes are 0
+        if total_stake == 0:
+            # If all stakes are 0, choose a random node as the validator
+            winner = random.choice([node['public_key'] for node in state])
+        else:
+            rand_num = random.uniform(0, 1)
+            cumulative_percentage = 0
+            for node in state:
+                node_percentage = node['staking'] / total_stake
+                cumulative_percentage += node_percentage
+                if rand_num <= cumulative_percentage:
+                    winner = node['public_key']
+                    break
+            else:
+                # If for some reason we don't select any node, return None
+                return None
+
+        self.winner = winner
+        if winner == self.wallet.public_key:
+            self.current_block.validator = self.wallet.public_key
+            return self.current_block
+        # if you didn't win don't return any block
+        return None
 
     def broadcast_block(self, block, r):
         baseurl = 'http://{}:{}/'.format(r['ip'], r['port'])
@@ -244,9 +262,10 @@ class Node:
         res = requests.post(baseurl + "AddBlock", json={'block': blockjson})
 
     def validate_block(self, block):
+        #gia na prospernaei to genesis
         if (block.previousHash_hex == 1 and block.validator == 0):
             return True
-        if (block.previousHash_hex == self.chain.chain[-1].compute_current_hash()):
+        if (block.validator == self.winner and block.previousHash_hex == self.chain.chain[-1].compute_current_hash()):
             return True
         else:
             return False

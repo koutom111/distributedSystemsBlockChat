@@ -125,7 +125,7 @@ def MakeFirstTransaction(pub_key, ip, port):
             time.sleep(0.1)
         else:
             break
-    node.nonce += 1 #ayksanw to nonce
+    node.nonce += 1 #ayksanw to nonce PREPEI NA VALW LOCK??????
     transaction = node.create_transaction(bootstrap_public_key, node.wallet.private_key, pub_key,
                                           'payment', amount, node.nonce,
                                           'your first money')  # ayto to node einai to bootstap se ayto to script

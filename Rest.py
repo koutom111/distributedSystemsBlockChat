@@ -65,18 +65,29 @@ def UpdateRing():
     for r in ring:
         r1 = r
         r1['public_key'] = makejsonSendableRSA(r1['public_key'])
-    node.ring.append(ring)
+        node.ring.append(r)
     # print(ring)
     print("------------------------")
     print(node.ring)
-
+    UpdateState(node.ring)
     # while(not(node.current_BCCs[-1][0] == 100 or node.BCCs[-1][0] == 100)):
     #     pass
     # start_new_thread(read_transaction, ())
 
     return "Ring Updated for node {}".format(node.id), 200
 
-
+def UpdateState(ring):
+    for r in ring:
+        node.state.append({
+            'id': r['id'],
+            'public_key': r['public_key'],
+            'balance': r['balance'],
+            'staking': 0,
+            'nonce': 0
+        })
+    # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    # print(node.state)
+    return node.state
 def ContactBootstrapNode(baseurl, host, port):
     public_key = node.wallet.public_key
     load = {'public_key': makeRSAjsonSendable(public_key), 'ip': host, 'port': port}
