@@ -126,9 +126,12 @@ def MakeFirstTransaction(pub_key, ip, port):
         else:
             break
     node.nonce += 1 #ayksanw to nonce PREPEI NA VALW LOCK??????
+    # pub_key einai JSON kai bootstrap_public_key RSA
     transaction = node.create_transaction(bootstrap_public_key, node.wallet.private_key, pub_key,
                                           'payment', amount, node.nonce,
                                           'your first money')  # ayto to node einai to bootstap se ayto to script
+    if transaction.verify_signature():
+        print("VERIFIED !!!!!!!!!!!!!!!!!!")
     # ti kanoyme me to nonce?? pros to paron to bazw 2
     transaction.printMe()
     return transaction
@@ -276,7 +279,7 @@ if __name__ == '__main__':
     node.nonce += 1
     first_transaction = node.create_transaction(0, None, BootstrapDictInstance['bootstrap_public_key'],
                                                 'payment', amount, node.nonce, 'First Transaction')
-    # TSEKARW AN TO SERIALIZATION TOY TRANSACTION DOYLEVEI, EINAI OK
+    # # TSEKARW AN TO SERIALIZATION TOY TRANSACTION DOYLEVEI, EINAI OK
     # serialized_transaction = pickle.dumps(first_transaction)
     #
     # # Deserialize the pickled data

@@ -11,6 +11,14 @@ import threading
 import time
 import jsonpickle
 from Crypto.Hash import SHA
+from Crypto.PublicKey import RSA
+
+def makeRSAjsonSendable(rsa):  # ????
+    return rsa.exportKey("PEM").decode('ascii')
+
+
+def makejsonSendableRSA(jsonSendable):  # ????
+    return RSA.importKey(jsonSendable.encode('ascii'))
 
 class Block:
     def __init__(self, index, previousHash_hex, timestamp, capacity, validator):
@@ -70,6 +78,22 @@ class Block:
     #  helpers?
     def add_transaction(self, transaction):
         self.listOfTransactions.append(transaction)
+
+    def convert_transactions(self):
+        for transaction in self.listOfTransactions:
+            if isinstance(transaction.sender_address, RSA.RsaKey):
+                transaction.sender_address = makeRSAjsonSendable(transaction.sender_address)
+
+            if isinstance(transaction.receiver_address, RSA.RsaKey):
+                transaction.receiver_address = makeRSAjsonSendable(transaction.receiver_address)
+
+    def revert_transactions(self):
+        for transaction in self.listOfTransactions:
+            if isinstance(transaction.sender_address, str):
+                transaction.sender_address = makejsonSendableRSA(transaction.sender_address)
+
+            #den me noiazei na allaksw pisw to receiver_address PROS TO PARON
+
 
     def printMe(self):
         print("\t I am block with index", self.index)
