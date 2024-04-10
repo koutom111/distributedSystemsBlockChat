@@ -26,8 +26,8 @@ from copy import deepcopy
 from Crypto.Signature import PKCS1_v1_5
 
 PRINTCHAIN = False
-# CLIENT = 1                                    # read transactions from noobcash client
-CLIENT = 0  # read transactions from txt
+CLIENT = 1                                    # read transactions from noobcash client
+#CLIENT = 0  # read transactions from txt
 
 app = Flask(__name__)
 CORS(app)
@@ -62,17 +62,17 @@ def UpdateRing():
     if data is None:
         return "Error: Please supply a valid Ring", 400
     ring = list(data.values())
-    node.ring = ring
-    print(ring[0])
-    print("------------------------")
-    print(node.ring)
-    r1 = None
     for r in ring:
         r1 = r
         r1['public_key'] = makejsonSendableRSA(r1['public_key'])
+
+    node.ring.append(ring)
+    print("------------------------")
+    print(node.ring)
+
     # while(not(node.current_BCCs[-1][0] == 100 or node.BCCs[-1][0] == 100)):
     #     pass
-    # start_new_thread(read_transaction, ())
+    start_new_thread(read_transaction, (node,))
 
     return "Ring Updated for node {}".format(node.id), 200
 

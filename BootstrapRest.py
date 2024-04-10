@@ -24,8 +24,8 @@ import base64
 
 
 PRINTCHAIN = False
-# CLIENT = 1                                    # read transactions from noobcash client
-CLIENT = 0  # read transactions from txt
+CLIENT = 1                                    # read transactions from noobcash client
+#CLIENT = 0  # read transactions from txt
 
 app = Flask(__name__)
 CORS(app)
@@ -41,50 +41,78 @@ def makejsonSendableRSA(jsonSendable):
 
 #######################  marika      ################################
 
-def read_transaction():  # na balw to cli script
-    if (CLIENT):
-        print("****** Welcome to Noobcash Client . . . ******")
+def read_transaction(node):  # na balw to cli script
+    help_message = '''
+    Available commands:
+    * `t [recepient_address] [message] [type]`                Send `message` of `type` transaction to `recepient` node
+    * `stake [amount]`                                        Set the node stake
+    * `view`                                                  View transactions of the latest block
+    * `balance`                                               View balance of each wallet (as of last validated block)
+    * `help`                                                  Print this help message
+    * `exit`                                                  Exit client (will not stop server)
+    '''
+    if CLIENT:
+        print("============================")
+        print("!!! WELCOME TO BLOCKCHAT !!!")
+        print("============================")
         while (True):
-            input1 = input()
-            if input1 == "view":
+            print("Enter a desired action! Type help if want to know the available actions!")
+            choice = input()
+
+            # Transaction
+            if choice.startswith('t'):
+                params = choice.split()
+
+                payload = {'address': params[1], 'coins': params[2]}
+
+                print('Transaction!')
+                print(payload)
+                # payload = json.dumps(payload)
+                #
+                # response = requests.post(URL + "create_transaction", data=payload,
+                #                          headers={'Content-type': 'application/json', 'Accept': 'text/plain'})
+                # if response.status_code == 200:
+                #     print('Transaction Done!')
+                # else:
+                #     print(f'Error: {response.text}')
+            #Stake
+            elif choice.startswith('s'):
+                params = choice.split()
+
+                payload = {'ammount': params[1]}
+                print('Stake!')
+                print(payload)
+                # payload = json.dumps(payload)
+                #
+                # response = requests.post(URL + "stake_ammount", data=payload,  # mporei na prepei na to allajoyme
+                #                          )
+                # if response.status_code == 200:
+                #     print('Successful Stake')
+                # else:
+                #     print(f'Error: {response.text}')
+            # view last transaction
+            elif choice == 'view':
                 node.chain.view()
-            elif input1 == "balance":
-                print("Wallet UTXO's: ", node.NBCs[node.id][0])
-            elif input1 == "help":
-                print(
-                    "t <recipient_address> <amount>   New transaction: Sends to recipient_address wallet, amount NBC coins from wallet sender_address.")
-                print(
-                    "view                             View last transactions: Displays the transactions contained in the last validated block.")
-                print("balance                          Show balance: Displays wallet UTXOs.")
+                # response = requests.get(URL + "view_transactions")
+                # print(response.json())
+            # balance
+            elif choice == 'balance':
+                print(node.BCCs)
+                print(node.current_BCCs)
+            # help
+            elif choice == 'help':
+                print(help_message)
             else:
-                message = "'" + input1 + "'"
-                a = input1.split()
-                try:
-                    int(a[2])
-                    if (a[0] == 't'):
-                        flag = 0
-                        for r in node.ring:
-                            if (r['ip'] == a[1]):
-                                flag = 1
-                                pk = r['public_key']
-                                node.create_transaction(node.wallet.address, node.wallet.private_key, pk, int(a[2]))
-                                break
-                        if (flag == 0):
-                            print("<recipient_address> invalid")
-                    else:
-                        print(message,
-                              "is not recognized as a command. Please type 'help' to see all the valid commands")
-                except:
-                    print(message,
-                          "except is not recognized as a command. Please type 'help' to see all the valid commands")
-    else:
-        f = open("5nodes/transactions" + str(node.id) + ".txt", "r")
-        for line in f:
-            id, amount = (line).split()
-            for n in node.ring:
-                if int(n['id']) == int(id[-1]):
-                    node.create_transaction(node.wallet.address, node.wallet.private_key, n['public_key'], int(amount))
-                    break
+                print("Invalid action. Try again!")
+    # ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????//
+    # else:
+    #     f = open("5nodes/transactions" + str(node.id) + ".txt", "r")
+    #     for line in f:
+    #         id, amount = (line).split()
+    #         for n in node.ring:
+    #             if int(n['id']) == int(id[-1]):
+    #                 node.create_transaction(node.wallet.address, node.wallet.private_key, n['public_key'], int(amount))
+    #                 break
 
 
 def FirstBroadcast(ring):
@@ -111,7 +139,7 @@ def FirstBroadcast(ring):
         serialized_load_b64 = base64.b64encode(json_load).decode('utf-8')
         resRing = requests.post(baseurl + "UpdateRing", json=serialized_load_b64)
         print(resRing)
-    # start_new_thread(read_transaction, ())
+    start_new_thread(read_transaction, (node,))
 
 
 def MakeFirstTransaction(pub_key, ip, port):
