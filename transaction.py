@@ -28,7 +28,7 @@ def makejsonSendableRSA(jsonSendable):  # ????
 
 class Transaction:
 
-    def __init__(self, sender_address, sender_private_key, recipient_address, transaction_type, amount, nonce, message,
+    def __init__(self, sender_address, sender_private_key, recipient_address, transaction_type, nonce, amount=None, message=None,
                  reals=None, realr=None):
         #prepei sender_address kai sender_private_key na einai RSA
         if not type(sender_address) == type(0) and not isinstance(sender_private_key, RSA.RsaKey):
@@ -88,6 +88,18 @@ class Transaction:
             return True
         except (ValueError, TypeError):
             return False
+
+    def calculate_charge(self):
+        if type(self.receiver_address) == type(0):  # stake
+            return self.amount
+        if self.transaction_type == 'coins':
+            total = self.amount + 0.03 * self.amount  # +3% charge
+            return total
+        elif self.transaction_type == 'message':
+            return len(self.message)
+        else:
+            print('Invalid type of transaction.')
+            return 0
 
     def printMe(self):
         sender = self.sender_address
