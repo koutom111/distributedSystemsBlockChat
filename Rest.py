@@ -76,7 +76,7 @@ def UpdateRing():
     #GIA NA TESTARW AN DOYLEVEI TO BROADCAST_TRANSACTION
     # pub_key = node.ring[0]['public_key']
     # transaction = node.create_transaction(node.wallet.public_key, node.wallet.private_key, pub_key,
-    #                                       'payment', 500, node.nonce,
+    #                                       'payment', node.nonce, 500,
     #                                       'your first money')
 
     # while(not(node.current_BCCs[-1][0] == 100 or node.BCCs[-1][0] == 100)):
@@ -91,15 +91,15 @@ def ValidateTransaction():
         return "Error: Please supply a valid Transaction", 400
     rejson = request.json
     # Deserialize transaction received from the server
-    trans = rejson["transaction"]
-    serialized_data = base64.b64decode(trans)
-    data = pickle.loads(serialized_data)
-    if data is None:
+    data = rejson["transaction"]
+    serialized_data = base64.b64decode(data)
+    trans = pickle.loads(serialized_data)
+    if trans is None:
         return "Error: Please supply a valid Transaction", 400
     # den me enoxlei to receiver_address na einai json PROS TO PARON
-    if isinstance(data.sender_address, str):
-        data.sender_address = makejsonSendableRSA(data.sender_address)
-    print(data.message)
+    if isinstance(trans.sender_address, str):
+        trans.sender_address = makejsonSendableRSA(trans.sender_address)
+    print(trans.message)
     print("BROADCASTED TRANSACTION!!!!!!!!!!!!!!")
     return "Great!", 200
     # valid = node.validate_transaction(trans)

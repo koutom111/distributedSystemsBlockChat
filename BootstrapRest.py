@@ -205,7 +205,7 @@ def register_nodes():
                         'bootstrap_public_key': BootstrapDictInstance['bootstrap_public_key'],
                         'blockchain': serialized_blockchain_b64,
                         'block_capacity': BLOCK_CAPACITY,
-                        'start_ring': {'id': 0, 'ip': '192.168.1.5', 'port': '5000',             # to be fixed for OUR bootstrap!!!
+                        'start_ring': {'id': 0, 'ip': '127.0.0.1', 'port': '5000',             # to be fixed for OUR bootstrap!!!
                                        'public_key': BootstrapDictInstance['bootstrap_public_key'],
                                        'balance': 0},
                         'current_block': serialized_current_block_b64,
@@ -215,6 +215,65 @@ def register_nodes():
     print(f"Response : {response.json}")
     return response
 
+@app.route('/ValidateTransaction', methods=['POST'])
+def ValidateTransaction():
+    if request is None:
+        return "Error: Please supply a valid Transaction", 400
+    rejson = request.json
+    # Deserialize transaction received from the server
+    data = rejson["transaction"]
+    serialized_data = base64.b64decode(data)
+    trans = pickle.loads(serialized_data)
+    if trans is None:
+        return "Error: Please supply a valid Transaction", 400
+    # den me enoxlei to receiver_address na einai json PROS TO PARON
+    if isinstance(trans.sender_address, str):
+        trans.sender_address = makejsonSendableRSA(trans.sender_address)
+    print(trans.message)
+    print("BROADCASTED TRANSACTION!!!!!!!!!!!!!!")
+    return "Great!", 200
+    # valid = node.validate_transaction(trans)
+    # if(valid):
+    #     node.add_transaction_to_block(trans)
+    #
+    #     return "Transaction Validated by Node {} !".format(node.id), 200
+    # else:
+    #     return "Error: Not valid!", 400
+
+@app.route('/AddBlock', methods=['POST'])
+def AddBlock():
+    if request is None:
+        return "Error: Please supply a valid Block", 400
+    rejson = request.json
+    # Deserialize transaction received from the server
+    data = rejson["block"]
+    serialized_data = base64.b64decode(data)
+    block = pickle.loads(serialized_data)
+    if block is None:
+        return "Error: Please supply a valid Block", 400
+
+    block.revert_transactions()
+    if(block.index > 0):
+        valid = node.validate_block(block)
+
+        if(valid):
+            node.chain.add_block_to_chain(block)
+
+            for t in block.listOfTransactions:
+                outputs = t.transaction_outputs
+                id = outputs[0][1]
+                realreceiver = outputs[0][2]
+                realsender = outputs[1][2]
+                amount = outputs[0][3]
+                node.NBCs[realreceiver][0] = node.NBCs[realreceiver][0] + amount
+                node.NBCs[realreceiver][1].append(id)
+                node.NBCs[realsender][0] = node.NBCs[realsender][0] - amount
+
+            for tran_iter in block.listOfTransactions:
+                node.completed_transactions.append(tran_iter)
+        else:
+            node.resolve_conflicts()
+    return "OK", 200
 
 @app.route('/')
 def home():

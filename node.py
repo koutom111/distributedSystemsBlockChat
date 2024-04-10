@@ -69,7 +69,7 @@ class Node:
     def generate_wallet(self):
         self.wallet = Wallet()
 
-    def create_transaction(self, sender, sender_private_key, receiver, transaction_type, amount, nonce, message):
+    def create_transaction(self, sender, sender_private_key, receiver, transaction_type, nonce, amount=None, message=None):
         realsender = None
         realreceiver = None
         if (DEBUG):
@@ -117,7 +117,7 @@ class Node:
                         realreceiver = self.id
                 except:
                     pass
-        transaction = Transaction(sender, sender_private_key, receiver, transaction_type, amount, nonce, message, reals=realsender, realr=realreceiver)
+        transaction = Transaction(sender, sender_private_key, receiver, transaction_type, nonce, amount, message, reals=realsender, realr=realreceiver)
 
         # if (not realsender == "genesis"):
         #     transaction.transaction_inputs = self.current_BCCs[realsender][1]
@@ -267,6 +267,55 @@ class Node:
         # if you didn't win don't return any block
         return None
 
+    def validate_transaction(self, transaction):
+
+        if not transaction.verify_signature():
+            return False
+
+        if transaction.id in self.seen:
+            return True
+
+        # If login is still going, you dont have the ring data (keys, balances, stakes) and there is nothing
+        # to really check. Just return, and don't keep the transaction.
+        if not self.login_complete:
+            return True
+
+        trans = Transaction(transaction.sender_address, transaction.sender_private_key, transaction.recipient_address, transaction.transaction_type, transaction.nonce, transaction.amount, transaction.message,
+                 transaction.reals, transaction.realr)
+
+        coins_needed = trans.calculate_charge()
+
+        sender_dict = self.ring[transaction.sender_address]
+        balance = sender_dict['balance']
+        stake = sender_dict['stake']
+        if (type == 'stake') & (coins_needed > balance):
+            return False
+        elif coins_needed > balance - stake:
+            # logging.info('Sender does not have enough coins.')
+            return False
+        else:
+            # logging.info('Sender okay to send.')
+
+            # If login is done, we keep the transaction.
+            # Afterwards, we check if we need to mint a block.
+            # Update the sender balance.
+            if type != 'stake':
+                sender_dict['balance'] -= trans.transaction_amount()
+
+            # logging.info('balances after trans', [node['balance'] for k,node in self.node_ring.items()])
+
+            # Add the recieved transaction, only if it has not been seen in a previous block!
+            self.transactions.append(trans)
+
+            if len(self.transactions) == self.capacity:
+                self.mint_block()
+                self.transactions = []
+            else:
+                pass
+                # logging.info('Not minting because transaction length is: ', len(self.transactions))
+
+            return True
+
     def broadcast_block(self, block, r):
         baseurl = 'http://{}:{}/'.format(r['ip'], r['port'])
         #kanw ta transactions xwris RSA attributes
@@ -295,6 +344,6 @@ class Node:
         self.nonce += 1
         self.staking = amount
         transaction = self.create_transaction(self.wallet.public_key, self.wallet.private_key, 0,
-                                          'payment', amount, self.nonce,
+                                          'payment', self.nonce, amount,
                                           'stake')
         return transaction
