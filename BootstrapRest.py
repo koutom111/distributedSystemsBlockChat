@@ -44,7 +44,7 @@ def makejsonSendableRSA(jsonSendable):
 def read_transaction(node):  # na balw to cli script
     help_message = '''
     Available commands:
-    * `t [recepient_address] [message] [type]`                Send `message` of `type` transaction to `recepient` node
+    * `t [recepient_address] [message] `                Send `message` of `type` transaction to `recepient` node
     * `stake [amount]`                                        Set the node stake
     * `view`                                                  View transactions of the latest block
     * `balance`                                               View balance of each wallet (as of last validated block)
@@ -63,10 +63,21 @@ def read_transaction(node):  # na balw to cli script
             if choice.startswith('t'):
                 params = choice.split()
 
-                payload = {'address': params[1], 'coins': params[2]}
+                payload = {'receiver_id': params[1], 'message': params[2]}
 
                 print('Transaction!')
                 print(payload)
+
+                flag = 0
+                for r in node.ring:
+                    if r['id'] == payload['receiver_id']:
+                        flag = 1
+                        #TO BE FIXED
+                        #pub_key = r['public_key']
+                        #node.create_transaction(node.wallet.address, node.wallet.private_key, pk, int(a[2]))
+                        break
+                if flag == 0:
+                    print("<recipient_address> invalid")
                 # payload = json.dumps(payload)
                 #
                 # response = requests.post(URL + "create_transaction", data=payload,
