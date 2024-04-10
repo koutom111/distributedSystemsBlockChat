@@ -11,17 +11,25 @@ import threading
 import time
 import jsonpickle
 from Crypto.Hash import SHA
+from Crypto.PublicKey import RSA
+
+def makeRSAjsonSendable(rsa):  # ????
+    return rsa.exportKey("PEM").decode('ascii')
+
+
+def makejsonSendableRSA(jsonSendable):  # ????
+    return RSA.importKey(jsonSendable.encode('ascii'))
 
 class Block:
-    def __init__(self, index, previousHash_hex, nonce, timestamp, capacity):
+    def __init__(self, index, previousHash_hex, timestamp, capacity, validator):
         self.index = index
         self.timestamp = timestamp
         self.listOfTransactions = []
         self.previousHash_hex = previousHash_hex
         self.capacity = capacity
-        self.nonce = nonce
         self.timeCreated = time.time()
         self.timeAdded = None
+        self.validator = validator
         self.lock = threading.Lock()
 
     def __getstate__(self):
@@ -35,7 +43,7 @@ class Block:
 
     def compute_current_hash(self):
         return SHA.new(
-            (str(self.index) + str(self.previousHash_hex) + str(self.nonce)).encode()
+            (str(self.index) + str(self.previousHash_hex)).encode()
         ).hexdigest()
 
     # def to_dict(self):
@@ -64,12 +72,28 @@ class Block:
         return ret
 
     # ti kanoume me to nonce
-    def myHash(self, nonce):
-        return SHA.new((str(self.index) + str(self.previousHash_hex) + str(self.nonce)).encode())
+    def myHash(self):
+        return SHA.new((str(self.index) + str(self.previousHash_hex)).encode())
 
     #  helpers?
     def add_transaction(self, transaction):
         self.listOfTransactions.append(transaction)
+
+    def convert_transactions(self):
+        for transaction in self.listOfTransactions:
+            if isinstance(transaction.sender_address, RSA.RsaKey):
+                transaction.sender_address = makeRSAjsonSendable(transaction.sender_address)
+
+            if isinstance(transaction.receiver_address, RSA.RsaKey):
+                transaction.receiver_address = makeRSAjsonSendable(transaction.receiver_address)
+
+    def revert_transactions(self):
+        for transaction in self.listOfTransactions:
+            if isinstance(transaction.sender_address, str):
+                transaction.sender_address = makejsonSendableRSA(transaction.sender_address)
+
+            #den me noiazei na allaksw pisw to receiver_address PROS TO PARON
+
 
     def printMe(self):
         print("\t I am block with index", self.index)

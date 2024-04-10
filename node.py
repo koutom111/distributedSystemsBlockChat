@@ -11,6 +11,10 @@
 # nonce : μετρητής transactions
 # state : λίστα με τους υπάρχοντες λογαριασμούς και τα υπόλοιπά τους
 # staking : για το proof-of-state
+import base64
+import pickle
+import random
+
 from block import Block
 from wallet import Wallet
 from transaction import Transaction
@@ -43,9 +47,9 @@ class Node:
         self.id = None  # 0...n-1   #auto 8a to balei o bootstrap
         self.BCCs = []
         self.current_BCCs = []
-        self.wallet = None  # created with create_wallet()   / prepei na to steilei sto bootstrap
+        self.wallet = None  # created with generate_wallet()   / prepei na to steilei sto bootstrap
         self.ring = []
-        self.create_wallet()
+        self.generate_wallet()
         self.previous_block = None
         self.current_block = None
         self.block_capacity = None
@@ -57,11 +61,12 @@ class Node:
         self.nonce = 0 #DIKO MAS
         self.state = [] #DIKO MAS
         self.staking =0 #DIKO MAS
+        self.winner = None #HELPER FOR VALIDATION
 
-    def create_new_block(self, index, previousHash_hex, nonce, timestamp, capacity):
-        return Block(index, previousHash_hex, nonce, timestamp, capacity)
+    def create_new_block(self, index, previousHash_hex, timestamp, capacity, validator):
+        return Block(index, previousHash_hex, timestamp, capacity, validator)
 
-    def create_wallet(self):
+    def generate_wallet(self):
         self.wallet = Wallet()
 
     def create_transaction(self, sender, sender_private_key, receiver, transaction_type, amount, nonce, message):
@@ -131,21 +136,31 @@ class Node:
         #     baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
         #     res = requests.post(baseurl + "ValidateTransaction", json={'transaction': transactionjson})
 
-        # for r in self.ring:
-        #     start_new_thread(self.broadcast_transaction, (transaction, r,))
+        if self.state:  #GIA NA TESTARW AN DOYLEVEI TO BROADCAST_TRANSACTION META TO SVHNW
+            for r in self.ring:
+                start_new_thread(self.broadcast_transaction, (transaction, r,))
         return transaction
 
     def broadcast_transaction(self, transaction, r):
         baseurl = 'http://{}:{}/'.format(r['ip'], r['port'])
-        transactionjson = jsonpickle.encode(transaction)
-        res = requests.post(baseurl + "ValidateTransaction", json={'transaction': transactionjson})
+        # den mporw na ta steilw an einai RSA
+        if isinstance(transaction.sender_address, RSA.RsaKey):
+            transaction.sender_address = makeRSAjsonSendable(transaction.sender_address)
+
+        if isinstance(transaction.receiver_address, RSA.RsaKey):
+            transaction.receiver_address = makeRSAjsonSendable(transaction.receiver_address)
+
+        json_trans = pickle.dumps(transaction)
+        serialized_trans_b64 = base64.b64encode(json_trans).decode('utf-8')
+        res = requests.post(baseurl + "ValidateTransaction", json={'transaction': serialized_trans_b64})
 
     def validate_transaction(self, transaction):
-        sender_address = transaction.sender_address
-        h = SHA.new(transaction.transaction_myid.encode())
-        signature = transaction.signature
-        pubkey = sender_address
-        verified = PKCS1_v1_5.new(pubkey).verify(h, signature)
+        # sender_address = transaction.sender_address
+        # h = SHA.new(transaction.transaction_myid.encode())
+        # signature = transaction.signature
+        # pubkey = sender_address
+        # verified = PKCS1_v1_5.new(pubkey).verify(h, signature)
+        verified = transaction.verify_signature()
         if (not (verified)):
             return False
 
@@ -221,76 +236,65 @@ class Node:
                 pass
         return 1
 
-    def mine_block(self):
-        self.current_block.nonce = 0
-        while (not (self.current_block.myHash(self.current_block.nonce).hexdigest().startswith(
-                '0' * self.current_block.difficulty))):
-            self.current_block.nonce += 1
-            if (self.current_block.index <= self.chain.chain[-1].index):
-                return
+    def mint_block(self):
+        state = self.state
+        seed = self.chain.chain[-1].compute_current_hash()
+        total_stake = sum(node['staking'] for node in state)
 
-        baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
-        blockjson = jsonpickle.encode(self.current_block)
-        res = requests.post(baseurl + "AddBlock", json={'block': blockjson})
+        random.seed(seed)
 
-        for r in self.ring:
-            start_new_thread(self.broadcast_block, (self.current_block, r))
-        return self.current_block
+        # Check if all stakes are 0
+        if total_stake == 0:
+            # If all stakes are 0, choose a random node as the validator
+            winner = random.choice([node['public_key'] for node in state])
+        else:
+            rand_num = random.uniform(0, 1)
+            cumulative_percentage = 0
+            for node in state:
+                node_percentage = node['staking'] / total_stake
+                cumulative_percentage += node_percentage
+                if rand_num <= cumulative_percentage:
+                    winner = node['public_key']
+                    break
+            else:
+                # If for some reason we don't select any node, return None
+                return None
+
+        self.winner = winner
+        if winner == self.wallet.public_key:
+            self.current_block.validator = self.wallet.public_key
+            return self.current_block
+        # if you didn't win don't return any block
+        return None
 
     def broadcast_block(self, block, r):
         baseurl = 'http://{}:{}/'.format(r['ip'], r['port'])
-
-        blockjson = jsonpickle.encode(block)
-        res = requests.post(baseurl + "AddBlock", json={'block': blockjson})
+        #kanw ta transactions xwris RSA attributes
+        block.convert_transactions()
+        json_block = pickle.dumps(block)
+        serialized_block_b64 = base64.b64encode(json_block).decode('utf-8')
+        res = requests.post(baseurl + "AddBlock", json={'block': serialized_block_b64})
 
     def validate_block(self, block):
-        curr_hash = SHA.new((str(block.index) + str(block.previousHash_hex) + str(block.nonce)).encode())
-        if (curr_hash.hexdigest().startswith('0' * block.difficulty) and block.previousHash_hex == self.chain.chain[
-            -1].currentHash_hex):
+        #gia na prospernaei to genesis
+        if (block.previousHash_hex == 1 and block.validator == 0):
+            return True
+        if (block.validator == self.winner and block.previousHash_hex == self.chain.chain[-1].compute_current_hash()):
             return True
         else:
             return False
 
     def validate_chain(self, blockchain):
         for block in blockchain.chain:
-            if (block.index > 0):
-                self.validate_block(block)
+            # if (block.index > 0):
+            if not self.validate_block(block):
+                return False
+            return True
 
-    def resolve_conflicts(self):
-
-        somechain = []
-        node_id = []
-        current_BCCs = []
-        BCCs = []
-        vt = []
-        for r in self.ring:
-            baseurl = 'http://{}:{}/'.format(r['ip'], r['port'])
-            res = requests.get(baseurl + "Chain").json()
-            somechain.append(jsonpickle.decode(res["chain"]))
-            node_id.append(res["id"])
-            current_BCCs.append(res["current_BCCs"])
-            BCCs.append(res["BCCs"])
-            vt.append(jsonpickle.decode(res["VT"]))
-        maxlen = len(somechain[0].chain)
-        for i in range(len(somechain)):
-            if (len(somechain[i].chain) > maxlen):
-                maxlen = len(somechain[i].chain)
-
-        k = 0
-        changed = 0
-
-        for i in range(len(somechain)):
-            if (len(somechain[i].chain) == maxlen):
-                k = i
-                changed = 1
-                break
-
-        if ((maxlen == len(self.chain.chain) and self.id < node_id[k]) or (len(self.chain.chain) > maxlen)):
-            return
-
-        if (changed):
-            self.chain = somechain[k]
-            self.current_BCCs = current_BCCs[k]
-            self.BCCs = BCCs[k]
-            self.validated_transactions = vt[k]
-        return
+    def stake(self, amount):
+        self.nonce += 1
+        self.staking = amount
+        transaction = self.create_transaction(self.wallet.public_key, self.wallet.private_key, 0,
+                                          'payment', amount, self.nonce,
+                                          'stake')
+        return transaction

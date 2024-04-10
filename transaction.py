@@ -30,7 +30,11 @@ class Transaction:
 
     def __init__(self, sender_address, sender_private_key, recipient_address, transaction_type, amount, nonce, message,
                  reals=None, realr=None):
-
+        #prepei sender_address kai sender_private_key na einai RSA
+        if not type(sender_address) == type(0) and not isinstance(sender_private_key, RSA.RsaKey):
+            sender_private_key = makejsonSendableRSA(sender_private_key)
+        if not type(sender_address) ==type(0) and not isinstance(sender_address, RSA.RsaKey):
+            sender_address = makejsonSendableRSA(sender_address)
         self.sender_address = sender_address
         self.receiver_address = recipient_address
         self.transaction_type = transaction_type
@@ -39,11 +43,13 @@ class Transaction:
         self.nonce = nonce
 
         self.signature = None  # na paroume periptwsh gia bootstrap node poy tote 8a exoyme validator=0
-        self.transaction_id_hex = self.calculate_transaction_id()
+        if (not type(self.sender_address) == type(0)):
+            self.signature = self.sign_transaction(sender_private_key)
+        self.transaction_id_hex = self.calculate_transaction_id().hexdigest()
 
         # helpers?????
-        self.rand = Crypto.Random.get_random_bytes(10)
-        self.transaction_myid = str(sender_address) + str(recipient_address) + str(amount) + str(self.rand)
+        # self.rand = Crypto.Random.get_random_bytes(10)
+        # self.transaction_myid = str(sender_address) + str(recipient_address) + str(amount) + str(self.rand)
         self.reals = reals
         self.realr = realr
         self.transaction_inputs = []
@@ -93,7 +99,7 @@ class Transaction:
     def calculate_transaction_id(self):
         transaction_content = (f"{self.sender_address}{self.receiver_address}{self.amount}{self.message}"
                                f"{self.transaction_type}{self.nonce}")
-        return SHA256.new(transaction_content.encode('utf-8')).hexdigest()  # hexdigest?????
+        return SHA256.new(transaction_content.encode('utf-8'))
 
         # self.transaction_id = SHA.new(
         #     (str(sender_address) + str(recipient_address) + str(value) + str(self.rand)).encode())
@@ -105,12 +111,19 @@ class Transaction:
         """
         Sign transaction with private key
         """
-        signature = PKCS1_v1_5.new(private_key).sign(self.transaction_id)
+        signature = PKCS1_v1_5.new(private_key).sign(self.calculate_transaction_id())
         return signature
 
     # helpers???????
-    def verify_transaction(self):
-        return True
+    def verify_signature(self):
+        """
+        Verify signature of sender (private, public keys)
+        """
+        try:
+            PKCS1_v1_5.new(self.sender_address).verify(self.calculate_transaction_id(), self.signature)
+            return True
+        except (ValueError, TypeError):
+            return False
 
     def printMe(self):
         sender = self.sender_address

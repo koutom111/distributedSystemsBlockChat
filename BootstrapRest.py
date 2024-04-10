@@ -153,9 +153,13 @@ def MakeFirstTransaction(pub_key, ip, port):
             time.sleep(0.1)
         else:
             break
+    node.nonce += 1 #ayksanw to nonce PREPEI NA VALW LOCK??????
+    # pub_key einai JSON kai bootstrap_public_key RSA
     transaction = node.create_transaction(bootstrap_public_key, node.wallet.private_key, pub_key,
-                                          'payment', amount, 2,
+                                          'payment', amount, node.nonce,
                                           'your first money')  # ayto to node einai to bootstap se ayto to script
+    if transaction.verify_signature():
+        print("VERIFIED !!!!!!!!!!!!!!!!!!")
     # ti kanoyme me to nonce?? pros to paron to bazw 2
     transaction.printMe()
     return transaction
@@ -272,8 +276,8 @@ if __name__ == '__main__':
     #print(BootstrapDict)
 
     # create genesis block
-    genesis_block = node.create_new_block(0, 1, 0, time.time(),
-                                          BLOCK_CAPACITY)  # index = 0, previousHash = 1, nonce = 0, capacity = BLOCK_CAPACITY
+    genesis_block = node.create_new_block(0, 1, time.time(),
+                                          BLOCK_CAPACITY, 0)  # index = 0, previousHash = 1, capacity = BLOCK_CAPACITY, validator=0
 
     #TSEKARW AN TO SERIALIZATION TOY BLOCK DOYLEVEI, ALLAZEI TO LOCK EPEIDH TO KANW EXCLUDE!!! EINAI THEMA??
     # serialized_genesis_block = pickle.dumps(genesis_block)
@@ -300,9 +304,10 @@ if __name__ == '__main__':
     # first transaction
     amount = 1000 * N
     BootstrapDictInstance = BootstrapDict.copy()
+    node.nonce += 1
     first_transaction = node.create_transaction(0, None, BootstrapDictInstance['bootstrap_public_key'],
-                                                'payment', amount, 1, 'First Transaction')
-    # TSEKARW AN TO SERIALIZATION TOY TRANSACTION DOYLEVEI, EINAI OK
+                                                'payment', amount, node.nonce, 'First Transaction')
+    # # TSEKARW AN TO SERIALIZATION TOY TRANSACTION DOYLEVEI, EINAI OK
     # serialized_transaction = pickle.dumps(first_transaction)
     #
     # # Deserialize the pickled data
@@ -327,8 +332,8 @@ if __name__ == '__main__':
     node.chain = blockchain
     print(node.chain.printMe())
     node.previous_block = None
-    node.current_block = node.create_new_block(1, genesis_block.compute_current_hash(), 0, time.time(),
-                                               BLOCK_CAPACITY)
+    node.current_block = node.create_new_block(1, genesis_block.compute_current_hash(), time.time(),
+                                               BLOCK_CAPACITY, None)
     # jekina
     print('\nNew Block:\n')
     print(f'{node.current_block.printMe()}')
