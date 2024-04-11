@@ -1,3 +1,5 @@
+import re
+
 import requests
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
@@ -120,14 +122,47 @@ def read_transaction(node):  # na balw to cli script
             else:
                 print("Invalid action. Try again!")
     # ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????//
-    # else:
-    #     f = open("5nodes/transactions" + str(node.id) + ".txt", "r")
-    #     for line in f:
-    #         id, amount = (line).split()
-    #         for n in node.ring:
-    #             if int(n['id']) == int(id[-1]):
-    #                 node.create_transaction(node.wallet.address, node.wallet.private_key, n['public_key'], int(amount))
-    #                 break
+    else:
+        input_file = f"../5nodes/trans{node.id}.txt"
+        with open(input_file, 'r') as file:
+            lines = file.readlines()
+
+        # Regular expression pattern to match 'id' followed by a number and the message
+        pattern = r'id(\d+)\s+(.*)'
+        start_time = time.time()
+        num_of_transactions = 0
+        for line in lines:
+            # Use regular expression to find matches
+            match = re.match(pattern, line)
+            if match:
+                id = int(match.group(1))
+                message = match.group(2)
+
+            for node in node.state:
+                if node['id'] == id:
+                    node.nonce+=1
+                    node.create_transaction(node.wallet.public_key,node.wallet.private_key, node['public_key'], "message", node.nonce, message)
+                    num_of_transactions += 1
+                    break
+        end_time = time.time()
+        print("start_time: ", start_time)
+        print("end_time: ", end_time)
+        duration = end_time - start_time
+        transactions_per_sec = num_of_transactions / duration
+        print("Transactions per second : ", transactions_per_sec)
+
+        timestamps = []
+        for block in node.chain.chain:
+            timestamps.append(block.timestamp)
+
+        timestamps.sort()
+        print("TIMESTAMPS:", timestamps)
+        durations = [timestamps[i + 1] - timestamps[i] for i in range(len(timestamps) - 1)]
+        print(len(node.chain.chain))
+        avg_block_duration = sum(durations) / len(durations) if durations else 0
+        print("Avg block duration : ", avg_block_duration)
+
+        return [transactions_per_sec, avg_block_duration]
 
 
 def FirstBroadcast(ring):
