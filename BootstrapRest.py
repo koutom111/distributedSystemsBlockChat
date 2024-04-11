@@ -303,14 +303,32 @@ def ValidateTransaction():
         trans.sender_address = makejsonSendableRSA(trans.sender_address)
     print(trans.message)
     print("BROADCASTED TRANSACTION!!!!!!!!!!!!!!")
-    return "Great!", 200
-    # valid = node.validate_transaction(trans)
-    # if(valid):
-    #     node.add_transaction_to_block(trans)
-    #
-    #     return "Transaction Validated by Node {} !".format(node.id), 200
-    # else:
-    #     return "Error: Not valid!", 400
+
+    valid = node.validate_transaction(trans)
+    if(valid):
+        node.temp_transactions.append(trans)
+
+        if len(node.temp_transactions) == node.block_capacity:
+            minted = node.mint_block()
+            if minted is not None:
+                for r in node.ring:
+                    start_new_thread(node.broadcast_block, (minted, r,))
+                    node.temp_transactions = []
+            else:
+                # wait
+
+            # create new block
+            node.current_block = node.create_new_block(node.current_block.index + 1,
+                                                       node.current_block.compute_current_hash, time.time(),
+                                                       node.current_block.capacity, None)
+        else:
+            pass
+            # logging.info('Not minting because transaction length is: ', len(self.transactions))
+
+        return "Transaction Validated by Node {} !".format(node.id), 200
+    else:
+        return "Error: Not valid!", 400
+
 
 
 @app.route('/AddBlock', methods=['POST'])
@@ -326,26 +344,16 @@ def AddBlock():
         return "Error: Please supply a valid Block", 400
 
     block.revert_transactions()
-    if (block.index > 0):
+    if(block.index > 0):
         valid = node.validate_block(block)
 
-        if (valid):
-            node.chain.add_block_to_chain(block)
-
-            for t in block.listOfTransactions:
-                outputs = t.transaction_outputs
-                id = outputs[0][1]
-                realreceiver = outputs[0][2]
-                realsender = outputs[1][2]
-                amount = outputs[0][3]
-                node.NBCs[realreceiver][0] = node.NBCs[realreceiver][0] + amount
-                node.NBCs[realreceiver][1].append(id)
-                node.NBCs[realsender][0] = node.NBCs[realsender][0] - amount
-
+        if(valid):
+            node.update_recipient_balances(block)
+            #?????????
             for tran_iter in block.listOfTransactions:
-                node.completed_transactions.append(tran_iter)
+                node.temp_transactions.append(tran_iter)
         else:
-            node.resolve_conflicts()
+            return "Error: Invalid Block", 400
     return "OK", 200
 
 
