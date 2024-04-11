@@ -57,10 +57,10 @@ class Node:
         self.temp_transactions = []
         self.validated_block_transactions = []
         self.all_lock = threading.Lock()
-        self.nonce = 0 #DIKO MAS
-        self.state = [] #DIKO MAS
-        self.staking =0 #DIKO MAS
-        self.winner = None #HELPER FOR VALIDATION
+        self.nonce = 0  # DIKO MAS
+        self.state = []  # DIKO MAS
+        self.staking = 0  # DIKO MAS
+        self.winner = None  # HELPER FOR VALIDATION
 
     def create_new_block(self, index, previousHash_hex, timestamp, capacity, validator):
         return Block(index, previousHash_hex, timestamp, capacity, validator)
@@ -116,28 +116,39 @@ class Node:
                         realreceiver = self.id
                 except:
                     pass
-        transaction = Transaction(sender, sender_private_key, receiver, transaction_type, nonce, amount, message, reals=realsender, realr=realreceiver)
+        transaction = Transaction(sender, sender_private_key, receiver, transaction_type, nonce, amount, message,
+                                  reals=realsender, realr=realreceiver)
 
-        # if (not realsender == "genesis"):
-        #     transaction.transaction_inputs = self.current_BCCs[realsender][1]
-        #
-        #     output_id1 = transaction.transaction_id_hex + 'a'
-        #     output1 = [output_id1, transaction.transaction_id_hex, int(realreceiver), amount]
-        #     transaction.transaction_outputs.append(output1)
-        #
-        #     output_id2 = transaction.transaction_id_hex + 'b'
-        #     output2 = [output_id2, transaction.transaction_id_hex, int(realsender),
-        #                self.current_BCCs[int(realsender)][0] - amount]
-        #     transaction.transaction_outputs.append(output2)
-        #
-        # if (transaction.signature):
-        #     transactionjson = jsonpickle.encode(transaction)
-        #     baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
-        #     res = requests.post(baseurl + "ValidateTransaction", json={'transaction': transactionjson})
+        if message == 'First Salary':
+            baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
+            if isinstance(transaction.sender_address, RSA.RsaKey):
+                transaction.sender_address = makeRSAjsonSendable(transaction.sender_address)
 
-        if self.state:  #GIA NA TESTARW AN DOYLEVEI TO BROADCAST_TRANSACTION META TO SVHNW
+            if isinstance(transaction.receiver_address, RSA.RsaKey):
+                transaction.receiver_address = makeRSAjsonSendable(transaction.receiver_address)
+
+            json_trans = pickle.dumps(transaction)
+            serialized_trans_b64 = base64.b64encode(json_trans).decode('utf-8')
+            res = requests.post(baseurl + "ValidateTransaction", json={'transaction': serialized_trans_b64})
+
+        elif message == 'First Transaction':
+            self.balance = amount
+        else:
+            if transaction.signature:
+                baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
+                if isinstance(transaction.sender_address, RSA.RsaKey):
+                    transaction.sender_address = makeRSAjsonSendable(transaction.sender_address)
+
+                if isinstance(transaction.receiver_address, RSA.RsaKey):
+                    transaction.receiver_address = makeRSAjsonSendable(transaction.receiver_address)
+
+                json_trans = pickle.dumps(transaction)
+                serialized_trans_b64 = base64.b64encode(json_trans).decode('utf-8')
+                res = requests.post(baseurl + "ValidateTransaction", json={'transaction': serialized_trans_b64})
+
             for r in self.ring:
-                start_new_thread(self.broadcast_transaction, (transaction, r,))      #prpei na ftiajoumr na perimenoyn na ginei apo olous validate!!!!!
+                start_new_thread(self.broadcast_transaction, (transaction, r,))
+
         return transaction
 
     def broadcast_transaction(self, transaction, r):
