@@ -57,10 +57,10 @@ class Node:
         self.temp_transactions = []
         self.validated_block_transactions = []
         self.all_lock = threading.Lock()
-        self.nonce = 0 #DIKO MAS
-        self.state = [] #DIKO MAS
-        self.staking =0 #DIKO MAS
-        self.winner = None #HELPER FOR VALIDATION
+        self.nonce = 0  # DIKO MAS
+        self.state = []  # DIKO MAS
+        self.staking = 0  # DIKO MAS
+        self.winner = None  # HELPER FOR VALIDATION
 
     def create_new_block(self, index, previousHash_hex, timestamp, capacity, validator):
         return Block(index, previousHash_hex, timestamp, capacity, validator)
@@ -68,7 +68,8 @@ class Node:
     def generate_wallet(self):
         self.wallet = Wallet()
 
-    def create_transaction(self, sender, sender_private_key, receiver, transaction_type, nonce, amount=None, message=None):
+    def create_transaction(self, sender, sender_private_key, receiver, transaction_type, nonce, amount=None,
+                           message=None):
         realsender = None
         realreceiver = None
         if (DEBUG):
@@ -120,19 +121,15 @@ class Node:
                                   reals=realsender, realr=realreceiver)
 
         if message == 'First Salary':
-            baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
-            if isinstance(transaction.sender_address, RSA.RsaKey):
-                transaction.sender_address = makeRSAjsonSendable(transaction.sender_address)
+            self.all_lock.acquire()
+            self.balance -= transaction.amount
+            self.all_lock.release()
 
-            if isinstance(transaction.receiver_address, RSA.RsaKey):
-                transaction.receiver_address = makeRSAjsonSendable(transaction.receiver_address)
-
-            json_trans = pickle.dumps(transaction)
-            serialized_trans_b64 = base64.b64encode(json_trans).decode('utf-8')
-            res = requests.post(baseurl + "ValidateTransaction", json={'transaction': serialized_trans_b64})
 
         elif message == 'First Transaction':
+            self.all_lock.acquire()
             self.balance = amount
+            self.all_lock.release()
         else:
             if transaction.signature:
                 baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
@@ -190,23 +187,24 @@ class Node:
 
         self.winner = winner
         if winner == self.wallet.public_key:
+            self.current_block.lock.acquire()
             self.current_block.validator = self.wallet.public_key
             for trans in self.temp_transactions:
                 self.current_block.listOfTransactions.append(trans)
+            self.current_block.lock.release()
+
             return self.current_block
         # if you didn't win don't return any block
         return None
 
     def validate_transaction(self, transaction):
-
         if not transaction.verify_signature():
-            return False
+            return False, 'Invalid signature'
 
-        if transaction.transaction_id_hex in self.validated_block_transactions: #?????????????????
-            return True
+        if transaction.transaction_id_hex in self.validated_block_transactions:  # ?????????????????
+            return True, 'Valid from previous block'
 
-        trans = Transaction(transaction.sender_address, transaction.sender_private_key, transaction.receiver_address, transaction.transaction_type, transaction.nonce, transaction.amount, transaction.message,
-                 transaction.reals, transaction.realr)
+        trans = transaction
 
         coins_needed = trans.calculate_charge()
         if self.wallet.public_key == trans.sender_address:
@@ -214,35 +212,40 @@ class Node:
             stake = self.staking
             nonce = self.nonce
             if nonce > trans.nonce:
-                return False
+                return False ,f'nonce>{nonce}'
         else:
             for r in self.state:
-                if r['public_key'] == transaction.sender_address:
+                # if isinstance(trans.sender_address, str):
+                #     trans.sender_address = makejsonSendableRSA(trans.sender_address)
+                # if isinstance(r['public_key'], str):
+                #     trans.sender_address = makejsonSendableRSA(r['public_key'])
+                # # if isinstance(trans.receiver_address, str):
+                # #     trans.receiver_address = makejsonSendableRSA(trans.receiver_address)
+                if r['public_key'] == trans.sender_address:
                     sender_dict = r
                     balance = sender_dict['balance']
                     stake = sender_dict['staking']
                     nonce = sender_dict['nonce']
 
-        if (type(transaction.receiver_address) == type(0)) & (coins_needed > balance):
-            return False
+        if (type(trans.receiver_address) == type(0)) & (coins_needed > balance):
+            return False, 'not enough for stake'
         elif coins_needed > balance - stake:
             # logging.info('Sender does not have enough coins.')
-            return False
-        elif nonce >= trans.nonce:
-            return False
+            return False, f'not enough! coins needed:{coins_needed} and balance {balance} and  stake {stake}'
         else:
-            return True
+            return True, f'All validated from me: coins needed:{coins_needed} and balance {balance} and  stake {stake}'
 
     def broadcast_block(self, block, r):
         baseurl = 'http://{}:{}/'.format(r['ip'], r['port'])
-        #kanw ta transactions xwris RSA attributes
+        # kanw ta transactions xwris RSA attributes
         block.convert_transactions()
         json_block = pickle.dumps(block)
         serialized_block_b64 = base64.b64encode(json_block).decode('utf-8')
         res = requests.post(baseurl + "AddBlock", json={'block': serialized_block_b64})
 
+
     def validate_block(self, block):
-        #gia na prospernaei to genesis
+        # gia na prospernaei to genesis
         if (block.previousHash_hex == 1 and block.validator == 0):
             return True
         if (block.validator == self.winner and block.previousHash_hex == self.chain.chain[-1].compute_current_hash()):
@@ -256,29 +259,117 @@ class Node:
 
             for i in range(len(self.temp_transactions)):
                 if self.temp_transactions[i].transaction_id_hex == trans.transaction_id_hex:
+
+                    validator = block.validator
+
+                    self.all_lock.acquire()
+
+                    if trans.transaction_type == 'coins':
+                        recipient = makejsonSendableRSA(trans.receiver_address)
+                        amount = trans.amount
+                        # Update recipient balance
+                        for r in self.state:
+                            # Give 3% to the block validator
+                            if r['public_key'] == validator:
+                                r['balance'] += amount * 0.03
+                        if self.wallet.public_key == recipient:
+                            self.balance += amount
+                    elif trans.type_of_transaction == 'message':
+                        amount = len(trans.message)
+                        for r in self.state:
+                            if r['public_key'] == validator:
+                                r['balance'] += amount
+
+                    self.all_lock.release()
                     del self.temp_transactions[i]
+                    break
 
-            if trans.transaction_id_hex not in self.validated_transactions:
-                validator = block.validator
+                elif trans.transaction_id_hex not in self.validated_block_transactions:
+                    validator = block.validator
 
-                if trans.transaction_type == 'coins':
-                    recipient = makejsonSendableRSA(trans['receiver_address'])
-                    amount = trans.amount
-                    # Update recipient balance
-                    for r in self.state:
-                    # Give 3% to the block validator
-                        if r['public_key'] == validator:
-                            r['balance'] += amount * 0.03
-                    if self.wallet.public_key == recipient:
-                        self.balance += amount
+                    self.all_lock.acquire()
 
-                elif trans.type_of_transaction == 'message':
-                    amount = len(trans.message)
-                    for r in self.state:
-                        if r['public_key'] == validator:
-                            r['balance'] += amount
+                    if trans.transaction_type == 'coins':
+                        recipient = makejsonSendableRSA(trans.receiver_address)
+                        amount = trans.amount
+                        # Update recipient balance
+                        for r in self.state:
+                            # Give 3% to the block validator
+                            if r['public_key'] == validator:
+                                r['balance'] += amount * 0.03
+                        if self.wallet.public_key == recipient:
+                            self.balance += amount
+                            # and sender balance?
+                    elif trans.type_of_transaction == 'message':
+                        amount = len(trans.message)
+                        for r in self.state:
+                            if r['public_key'] == validator:
+                                r['balance'] += amount
+
+                    if self.wallet.public_key == trans.sender_address:  # an eimai o sender
+                        if (type(trans.receiver_address) == type(0)):
+                            self.staking = trans.amount  # an exw kanei egw stake
+                        else:
+                            self.balance -= trans.calculate_charge()  # an egw exw xrewsei kapoion
+                    elif not (type(trans.receiver_address) == type(
+                            0)):  # an den einai stake kai kapoios allos einai o sender
+                        for r in self.state:
+                            if r['public_key'] == trans.sender_address:  # vres poios einai o sender kai afairesai poso
+                                r['balance'] -= trans.calculate_charge()
+                                r['nonce'] = trans.nonce
+                    else:
+                        for r in self.state:  # vres poios exei balei na kanei stake
+                            if r['public_key'] == trans.sender_address:
+                                r['staking'] = trans.amount
+                                r['nonce'] = trans.nonce
+
+                    if trans.transaction_type == 'coins':
+                        recipient = makejsonSendableRSA(trans.receiver_address)
+                        amount = trans.amount
+                        # Update recipient balance
+                        if self.wallet.public_key == recipient:
+                            self.balance += amount
+                        else:
+                            for r in self.state:
+                                if r['public_key'] == recipient:
+                                    r['balance'] += amount
+
+                    # if trans.transaction_type == 'message':
+                    #     recipient = makejsonSendableRSA(trans['receiver_address'])
+                    #     message = trans.message
+                    #     # Update recipient balance
+                    #     if self.wallet.public_key == recipient:
+                    #         print(f'I received message: {message} from {trans.sender_address}')
+
+                    self.all_lock.release()
 
                 self.validated_block_transactions.append(trans.transaction_id_hex)
+
+    def traceback_transaction(self):
+        for trans in self.temp_transactions:
+            self.all_lock.acquire()
+            if self.wallet.public_key == trans.sender_address:  # an eimai o sender
+                if (type(trans.receiver_address) == type(0)):
+                    pass  # an exw kanei egw stake
+                else:
+                    self.balance += trans.calculate_charge()  # an egw exw xrewsei kapoion
+            elif not (type(trans.receiver_address) == type(0)):  # an den einai stake kai kapoios allos einai o sender
+                for r in self.state:
+                    if r['public_key'] == trans.sender_address:  # vres poios einai o sender kai afairesai poso
+                        r['balance'] += trans.calculate_charge()
+
+            if trans.transaction_type == 'coins':
+                recipient = makejsonSendableRSA(trans.receiver_address)
+                amount = trans.amount
+                # Update recipient balance
+                if self.wallet.public_key == recipient:
+                    self.balance -= amount
+                else:
+                    for r in self.state:
+                        if r['public_key'] == recipient:
+                            r['balance'] -= amount
+
+            self.all_lock.release()
 
     def validate_chain(self, blockchain):
         for block in blockchain.chain:
@@ -288,9 +379,13 @@ class Node:
             return True
 
     def stake(self, amount):
-        self.nonce += 1 # lock?
+        self.all_lock.acquire()
+        self.nonce += 1
+        self.all_lock.release()
+
         self.staking = amount
+
         transaction = self.create_transaction(self.wallet.public_key, self.wallet.private_key, 0,
-                                          'payment', self.nonce, amount,
-                                          'stake')
+                                              'payment', self.nonce, amount,
+                                              'stake')
         return transaction
