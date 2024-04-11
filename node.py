@@ -55,7 +55,7 @@ class Node:
         self.myip = None
         self.myport = None
         self.temp_transactions = []
-        self.validated_transactions = []
+        self.validated_block_transactions = []
         self.all_lock = threading.Lock()
         self.nonce = 0 #DIKO MAS
         self.state = [] #DIKO MAS
@@ -137,7 +137,7 @@ class Node:
 
         if self.state:  #GIA NA TESTARW AN DOYLEVEI TO BROADCAST_TRANSACTION META TO SVHNW
             for r in self.ring:
-                start_new_thread(self.broadcast_transaction, (transaction, r,))
+                start_new_thread(self.broadcast_transaction, (transaction, r,))      #prpei na ftiajoumr na perimenoyn na ginei apo olous validate!!!!!
         return transaction
 
     def broadcast_transaction(self, transaction, r):
@@ -152,65 +152,6 @@ class Node:
         json_trans = pickle.dumps(transaction)
         serialized_trans_b64 = base64.b64encode(json_trans).decode('utf-8')
         res = requests.post(baseurl + "ValidateTransaction", json={'transaction': serialized_trans_b64})
-
-    def add_transaction_to_block(self, transaction):
-        self.all_lock.acquire()
-        for b in self.chain.chain:
-            for trans_iter in b.listOfTransactions:
-                if (transaction.transaction_id_hex == trans_iter.transaction_id_hex):
-                    try:
-                        self.all_lock.release()
-                    except:
-                        pass
-                    return False
-
-        for trans_iter in self.completed_transactions:
-            if (transaction.transaction_id_hex == trans_iter.transaction_id_hex):
-                try:
-                    self.all_lock.release()
-                except:
-                    pass
-                return False
-
-        for trans_iter in self.validated_transactions:
-            if (transaction.transaction_id_hex == trans_iter.transaction_id_hex):
-                try:
-                    self.all_lock.release()
-                except:
-                    pass
-                return False
-
-        for trans_iter in self.current_block.listOfTransactions:
-            if (transaction.transaction_id_hex == trans_iter.transaction_id_hex):
-                try:
-                    self.all_lock.release()
-                except:
-                    pass
-                return False
-        self.current_block.add_transaction(transaction)
-        self.validated_transactions.append(transaction)
-
-        if (len(self.current_block.listOfTransactions) == self.current_block.capacity):
-            try:
-                self.all_lock.release()
-            except:
-                pass
-            finally:
-                self.all_lock.acquire()
-            minted_block = self.mint_block()
-            self.current_block = self.create_new_block(self.current_block.index + 1, self.current_block.currentHash_hex,
-                                                       0, time.time(), self.current_block.difficulty,
-                                                       self.current_block.capacity)
-            try:
-                self.all_lock.release()
-            except:
-                pass
-        else:
-            try:
-                self.all_lock.release()
-            except:
-                pass
-        return 1
 
     def mint_block(self):
         state = self.state
@@ -250,7 +191,7 @@ class Node:
         if not transaction.verify_signature():
             return False
 
-        if transaction.transaction_id_hex in self.validated_transactions: #?????????????????
+        if transaction.transaction_id_hex in self.validated_block_transactions: #?????????????????
             return True
 
         trans = Transaction(transaction.sender_address, transaction.sender_private_key, transaction.receiver_address, transaction.transaction_type, transaction.nonce, transaction.amount, transaction.message,
@@ -279,22 +220,6 @@ class Node:
         elif nonce >= trans.nonce:
             return False
         else:
-            if self.wallet.public_key == trans.sender_address:
-                if (type(transaction.receiver_address) == type(0)):
-                    self.staking = trans.amount
-                else:
-                    self.balance -= trans.calculate_charge()
-            elif not (type(transaction.receiver_address) == type(0)):
-                sender_dict['balance'] -= trans.calculate_charge()
-                sender_dict['nonce'] = trans.nonce
-            else:
-                sender_dict['staking'] = transaction.amount
-                sender_dict['nonce'] = trans.nonce
-
-
-            # logging.info('balances after trans', [node['balance'] for k,node in self.node_ring.items()])
-            # Add the received transaction, only if it has not been seen in a previous block!
-
             return True
 
     def broadcast_block(self, block, r):
@@ -317,30 +242,27 @@ class Node:
     def update_recipient_balances(self, block):
         # logging.info('Validating block from minter', block.validator)
         for trans in block.listOfTransactions:
-            # delete from list of pending transactions, if its still there.
-            i = 0
-            while i < len(self.temp_transactions):
+
+            for i in range(len(self.temp_transactions)):
                 if self.temp_transactions[i].transaction_id_hex == trans.transaction_id_hex:
                     del self.temp_transactions[i]
-                    continue
-                i += 1
 
-            if trans.transaction_id_hex not in self.validated_transactions:
+            # delete from list of pending transactions, if its still there.
+            # i = 0
+            # while i < len(self.temp_transactions):
+            #     if self.temp_transactions[i].transaction_id_hex == trans.transaction_id_hex:
+            #         del self.temp_transactions[i]
+            #         continue
+            #     i += 1
+
+            if trans.transaction_id_hex not in self.validated_block_transactions:
                 validator = block.validator
 
-                if (type(trans.receiver_address) == type(0)):
-                    amount = trans.amount
-                    sender = trans['sender_address']
-                    for r in self.state:
-                        if r['public_key'] == sender:
-                            r['staking'] = amount
-                elif trans.transaction_type == 'coins':
+                if trans.transaction_type == 'coins':
                     recipient = makejsonSendableRSA(trans['receiver_address'])
                     amount = trans.amount
                     # Update recipient balance
                     for r in self.state:
-                        if r['public_key'] == recipient:
-                            r['balance'] += amount
                     # Give 3% to the block validator
                         if r['public_key'] == validator:
                             r['balance'] += amount * 0.03
@@ -353,7 +275,7 @@ class Node:
                         if r['public_key'] == validator:
                             r['balance'] += amount
 
-                self.validated_transactions.append(trans.transaction_id_hex)
+                self.validated_block_transactions.append(trans.transaction_id_hex)
 
     def validate_chain(self, blockchain):
         for block in blockchain.chain:

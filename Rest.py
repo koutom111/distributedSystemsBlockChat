@@ -106,6 +106,39 @@ def ValidateTransaction():
     if(valid):
         node.temp_transactions.append(trans)
 
+        if node.wallet.public_key == trans.sender_address:
+            if (type(trans.receiver_address) == type(0)):
+                node.staking = trans.amount
+            else:
+                node.balance -= trans.calculate_charge()
+        elif not (type(trans.receiver_address) == type(0)):
+            for r in node.state:
+                if r['public_key'] == trans.sender_address:
+                    r['balance'] -= trans.calculate_charge()
+                    r['nonce'] = trans.nonce
+        else:
+            for r in node.state:
+                if r['public_key'] == trans.sender_address:
+                  r['staking'] = trans.amount
+                  r['nonce'] = trans.nonce
+
+        if (type(trans.receiver_address) == type(0)):
+            amount = trans.amount
+            sender = trans['sender_address']
+            for r in node.state:
+                if r['public_key'] == sender:
+                    r['staking'] = amount
+        elif trans.transaction_type == 'coins':
+            recipient = makejsonSendableRSA(trans['receiver_address'])
+            amount = trans.amount
+            # Update recipient balance
+            for r in node.state:
+                if r['public_key'] == recipient:
+                    r['balance'] += amount
+            if node.wallet.public_key == recipient:
+                node.balance += amount
+
+
         if len(node.temp_transactions) == node.block_capacity:
             minted = node.mint_block()
             if minted is not None:
