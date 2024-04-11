@@ -104,7 +104,24 @@ def ValidateTransaction():
 
     valid = node.validate_transaction(trans)
     if(valid):
-        node.current_block.add_transaction(trans)
+        node.temp_transactions.append(trans)
+
+        if len(node.temp_transactions) == node.block_capacity:
+            minted = node.mint_block()
+            if minted is not None:
+                for r in node.ring:
+                    start_new_thread(node.broadcast_block, (minted, r,))
+                    node.temp_transactions = []
+            else:
+                # wait
+
+            # create new block
+            node.current_block = node.create_new_block(node.current_block.index + 1,
+                                                       node.current_block.compute_current_hash, time.time(),
+                                                       node.current_block.capacity, None)
+        else:
+            pass
+            # logging.info('Not minting because transaction length is: ', len(self.transactions))
 
         return "Transaction Validated by Node {} !".format(node.id), 200
     else:

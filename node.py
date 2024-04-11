@@ -239,6 +239,8 @@ class Node:
         self.winner = winner
         if winner == self.wallet.public_key:
             self.current_block.validator = self.wallet.public_key
+            for trans in self.temp_transactions:
+                self.current_block.listOfTransactions.append(trans)
             return self.current_block
         # if you didn't win don't return any block
         return None
@@ -248,7 +250,7 @@ class Node:
         if not transaction.verify_signature():
             return False
 
-        if transaction.transaction_id_hex in self.validated_transactions:
+        if transaction.transaction_id_hex in self.validated_transactions: #?????????????????
             return True
 
         trans = Transaction(transaction.sender_address, transaction.sender_private_key, transaction.receiver_address, transaction.transaction_type, transaction.nonce, transaction.amount, transaction.message,
@@ -259,6 +261,8 @@ class Node:
             balance = self.balance
             stake = self.staking
             nonce = self.nonce
+            if nonce > trans.nonce:
+                return False
         else:
             for r in self.state:
                 if r['public_key'] == transaction.sender_address:
@@ -276,8 +280,10 @@ class Node:
             return False
         else:
             if self.wallet.public_key == trans.sender_address:
-                self.balance -= trans.calculate_charge()
-                self.nonce = trans.nonce
+                if (type(transaction.receiver_address) == type(0)):
+                    self.staking = trans.amount
+                else:
+                    self.balance -= trans.calculate_charge()
             elif not (type(transaction.receiver_address) == type(0)):
                 sender_dict['balance'] -= trans.calculate_charge()
                 sender_dict['nonce'] = trans.nonce
@@ -288,24 +294,6 @@ class Node:
 
             # logging.info('balances after trans', [node['balance'] for k,node in self.node_ring.items()])
             # Add the received transaction, only if it has not been seen in a previous block!
-            self.temp_transactions.append(trans)
-            self.current_block.listOfTransactions.append(trans)
-
-            if len(self.temp_transactions) == self.block_capacity:
-                minted = self.mint_block()
-                if minted is not None:
-                    for r in self.ring:
-                        start_new_thread(self.broadcast_block, (minted, r,))
-                else:
-                        # wait
-                self.temp_transactions = []
-                #create new block
-                self.current_block = self.create_new_block(self.current_block.index + 1,
-                                                           self.current_block.compute_current_hash, time.time(),
-                                                           self.current_block.capacity, None)
-            else:
-                pass
-                # logging.info('Not minting because transaction length is: ', len(self.transactions))
 
             return True
 
@@ -346,8 +334,8 @@ class Node:
                     for r in self.state:
                         if r['public_key'] == sender:
                             r['staking'] = amount
-                elif trans.type_of_transaction == 'coins':
-                    recipient = trans['receiver_address']
+                elif trans.transaction_type == 'coins':
+                    recipient = makejsonSendableRSA(trans['receiver_address'])
                     amount = trans.amount
                     # Update recipient balance
                     for r in self.state:
@@ -375,7 +363,7 @@ class Node:
             return True
 
     def stake(self, amount):
-        self.nonce += 1
+        self.nonce += 1 # lock?
         self.staking = amount
         transaction = self.create_transaction(self.wallet.public_key, self.wallet.private_key, 0,
                                           'payment', self.nonce, amount,
