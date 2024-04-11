@@ -46,6 +46,7 @@ class Node:
         self.current_id_count = None  # +1 every time a node is added
         self.id = None  # 0...n-1   #auto 8a to balei o bootstrap
         self.BCCs = []
+        self.balance = 0
         self.current_BCCs = []
         self.wallet = None  # created with generate_wallet()   / prepei na to steilei sto bootstrap
         self.ring = []
@@ -58,10 +59,10 @@ class Node:
         self.completed_transactions = []
         self.validated_transactions = []
         self.all_lock = threading.Lock()
-        self.nonce = 0 #DIKO MAS
-        self.state = [] #DIKO MAS
-        self.staking =0 #DIKO MAS
-        self.winner = None #HELPER FOR VALIDATION
+        self.nonce = 0  # DIKO MAS
+        self.state = []  # DIKO MAS
+        self.staking = 0  # DIKO MAS
+        self.winner = None  # HELPER FOR VALIDATION
 
     def create_new_block(self, index, previousHash_hex, timestamp, capacity, validator):
         return Block(index, previousHash_hex, timestamp, capacity, validator)
@@ -69,7 +70,8 @@ class Node:
     def generate_wallet(self):
         self.wallet = Wallet()
 
-    def create_transaction(self, sender, sender_private_key, receiver, transaction_type, nonce, amount=None, message=None):
+    def create_transaction(self, sender, sender_private_key, receiver, transaction_type, nonce, amount=None,
+                           message=None):
         realsender = None
         realreceiver = None
         if (DEBUG):
@@ -117,28 +119,39 @@ class Node:
                         realreceiver = self.id
                 except:
                     pass
-        transaction = Transaction(sender, sender_private_key, receiver, transaction_type, nonce, amount, message, reals=realsender, realr=realreceiver)
+        transaction = Transaction(sender, sender_private_key, receiver, transaction_type, nonce, amount, message,
+                                  reals=realsender, realr=realreceiver)
 
-        # if (not realsender == "genesis"):
-        #     transaction.transaction_inputs = self.current_BCCs[realsender][1]
-        #
-        #     output_id1 = transaction.transaction_id_hex + 'a'
-        #     output1 = [output_id1, transaction.transaction_id_hex, int(realreceiver), amount]
-        #     transaction.transaction_outputs.append(output1)
-        #
-        #     output_id2 = transaction.transaction_id_hex + 'b'
-        #     output2 = [output_id2, transaction.transaction_id_hex, int(realsender),
-        #                self.current_BCCs[int(realsender)][0] - amount]
-        #     transaction.transaction_outputs.append(output2)
-        #
-        # if (transaction.signature):
-        #     transactionjson = jsonpickle.encode(transaction)
-        #     baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
-        #     res = requests.post(baseurl + "ValidateTransaction", json={'transaction': transactionjson})
+        if message == 'First Salary':
+            baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
+            if isinstance(transaction.sender_address, RSA.RsaKey):
+                transaction.sender_address = makeRSAjsonSendable(transaction.sender_address)
 
-        if self.state:  #GIA NA TESTARW AN DOYLEVEI TO BROADCAST_TRANSACTION META TO SVHNW
+            if isinstance(transaction.receiver_address, RSA.RsaKey):
+                transaction.receiver_address = makeRSAjsonSendable(transaction.receiver_address)
+
+            json_trans = pickle.dumps(transaction)
+            serialized_trans_b64 = base64.b64encode(json_trans).decode('utf-8')
+            res = requests.post(baseurl + "ValidateTransaction", json={'transaction': serialized_trans_b64})
+
+        elif message == 'First Transaction':
+            self.balance = amount
+        else:
+            if transaction.signature:
+                baseurl = 'http://{}:{}/'.format(self.myip, self.myport)
+                if isinstance(transaction.sender_address, RSA.RsaKey):
+                    transaction.sender_address = makeRSAjsonSendable(transaction.sender_address)
+
+                if isinstance(transaction.receiver_address, RSA.RsaKey):
+                    transaction.receiver_address = makeRSAjsonSendable(transaction.receiver_address)
+
+                json_trans = pickle.dumps(transaction)
+                serialized_trans_b64 = base64.b64encode(json_trans).decode('utf-8')
+                res = requests.post(baseurl + "ValidateTransaction", json={'transaction': serialized_trans_b64})
+
             for r in self.ring:
                 start_new_thread(self.broadcast_transaction, (transaction, r,))
+
         return transaction
 
     def broadcast_transaction(self, transaction, r):
@@ -280,8 +293,9 @@ class Node:
         if not self.login_complete:
             return True
 
-        trans = Transaction(transaction.sender_address, transaction.sender_private_key, transaction.recipient_address, transaction.transaction_type, transaction.nonce, transaction.amount, transaction.message,
-                 transaction.reals, transaction.realr)
+        trans = Transaction(transaction.sender_address, transaction.sender_private_key, transaction.recipient_address,
+                            transaction.transaction_type, transaction.nonce, transaction.amount, transaction.message,
+                            transaction.reals, transaction.realr)
 
         coins_needed = trans.calculate_charge()
 
@@ -318,14 +332,14 @@ class Node:
 
     def broadcast_block(self, block, r):
         baseurl = 'http://{}:{}/'.format(r['ip'], r['port'])
-        #kanw ta transactions xwris RSA attributes
+        # kanw ta transactions xwris RSA attributes
         block.convert_transactions()
         json_block = pickle.dumps(block)
         serialized_block_b64 = base64.b64encode(json_block).decode('utf-8')
         res = requests.post(baseurl + "AddBlock", json={'block': serialized_block_b64})
 
     def validate_block(self, block):
-        #gia na prospernaei to genesis
+        # gia na prospernaei to genesis
         if (block.previousHash_hex == 1 and block.validator == 0):
             return True
         if (block.validator == self.winner and block.previousHash_hex == self.chain.chain[-1].compute_current_hash()):
@@ -344,6 +358,5 @@ class Node:
         self.nonce += 1
         self.staking = amount
         transaction = self.create_transaction(self.wallet.public_key, self.wallet.private_key, 0,
-                                          'payment', self.nonce, amount,
-                                          'stake')
+                                              'coins', self.nonce, amount)
         return transaction

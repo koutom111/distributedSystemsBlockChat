@@ -28,12 +28,13 @@ def makejsonSendableRSA(jsonSendable):  # ????
 
 class Transaction:
 
-    def __init__(self, sender_address, sender_private_key, recipient_address, transaction_type, nonce, amount=None, message=None,
+    def __init__(self, sender_address, sender_private_key, recipient_address, transaction_type, nonce, amount=None,
+                 message=None,
                  reals=None, realr=None):
-        #prepei sender_address kai sender_private_key na einai RSA
+        # prepei sender_address kai sender_private_key na einai RSA
         if not type(sender_address) == type(0) and not isinstance(sender_private_key, RSA.RsaKey):
             sender_private_key = makejsonSendableRSA(sender_private_key)
-        if not type(sender_address) ==type(0) and not isinstance(sender_address, RSA.RsaKey):
+        if not type(sender_address) == type(0) and not isinstance(sender_address, RSA.RsaKey):
             sender_address = makejsonSendableRSA(sender_address)
         self.sender_address = sender_address
         self.receiver_address = recipient_address
@@ -52,13 +53,9 @@ class Transaction:
         # self.transaction_myid = str(sender_address) + str(recipient_address) + str(amount) + str(self.rand)
         self.reals = reals
         self.realr = realr
-        self.transaction_inputs = []
-        self.transaction_outputs = []
         # self.transaction_id_hex = self.transaction_id.hexdigest()
         self.timeCreated = time.time()
         self.timeAdded = None
-
-
 
     def calculate_transaction_id(self):
         transaction_content = (f"{self.sender_address}{self.receiver_address}{self.amount}{self.message}"
@@ -108,5 +105,13 @@ class Transaction:
             sender = self.reals
         if (not self.realr == None):
             receiver = self.realr
-        print("\t \t I am transaction ({}) giving {} $ from node {} to node {}".format(self.transaction_id_hex,
-                                                                                       self.amount, sender, receiver))
+
+        message = self.message
+
+        if self.message is None:
+            message = self.amount
+
+        print("\t \t I AM transaction ({}) of TYPE {}and I SEND {} $ from node {} to node {}".format(
+            self.transaction_id_hex,
+            self.transaction_type,
+            message, sender, receiver))

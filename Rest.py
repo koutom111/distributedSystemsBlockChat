@@ -70,7 +70,7 @@ def UpdateRing():
     print("------------------------")
     print(node.ring)
     UpdateState(node.ring)
-    node.stake(10)
+    #node.stake(10)
     print("&&&&&&&&&&&&&")
     print(node.staking)
     #GIA NA TESTARW AN DOYLEVEI TO BROADCAST_TRANSACTION
@@ -84,6 +84,27 @@ def UpdateRing():
     start_new_thread(read_transaction, (node,))
 
     return "Ring Updated for node {}".format(node.id), 200
+
+
+# @app.route('/ValidateTransaction', methods=['POST'])
+# def ValidateTransaction():
+#     if request is None:
+#         return "Error: Please supply a valid Transaction", 400
+#     data = request.json
+#     if data is None:
+#         return "Error: Please supply a valid Transaction", 400
+#     print(f'Received  ValidateTransaction data: {data}')
+#     return data
+#     # trans = jsonpickle.decode(data["transaction"])
+#     # valid = node.validate_transaction(trans)                        #to be fixed!!!
+#     # if(valid):
+#     #     node.add_transaction_to_block(transaction)                  #to be fixed!!!!!!!
+#     #
+#     #     return "Transaction Validated by Node {} !".format(node.id), 200
+#     # else:
+#     #     return "Error: Not valid!", 400
+
+
 
 @app.route('/ValidateTransaction', methods=['POST'])
 def ValidateTransaction():
@@ -218,11 +239,12 @@ if __name__ == '__main__':
     port = sys.argv[1]
     if len(sys.argv) > 1:
         print("Hello my port is:", port)
+        node.myport = port
     else:
         print("No port was provided.")
-
     #
     baseurl = 'http://{}:{}/'.format("127.0.0.1", "5000")
     host = '127.0.0.1'
+    node.myip = host
     ContactBootstrapNode(baseurl, host, port)
     app.run(host=host, port=int(port), debug=False, use_reloader=False)

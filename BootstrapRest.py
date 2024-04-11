@@ -22,10 +22,9 @@ from copy import deepcopy
 from Crypto.Signature import PKCS1_v1_5
 import base64
 
-
 PRINTCHAIN = False
-CLIENT = 1                                    # read transactions from noobcash client
-#CLIENT = 0  # read transactions from txt
+CLIENT = 1  # read transactions from noobcash client
+# CLIENT = 0  # read transactions from txt
 
 app = Flask(__name__)
 CORS(app)
@@ -49,7 +48,6 @@ def read_transaction(node):  # na balw to cli script
     * `view`                                                  View transactions of the latest block
     * `balance`                                               View balance of each wallet (as of last validated block)
     * `help`                                                  Print this help message
-    * `exit`                                                  Exit client (will not stop server)
     '''
     if CLIENT:
         print("============================")
@@ -63,44 +61,51 @@ def read_transaction(node):  # na balw to cli script
             if choice.startswith('t'):
                 params = choice.split()
 
-                payload = {'receiver_id': params[1], 'message': params[2]}
+                payload = {'receiver_id': int(params[1]), 'message': params[2]}
 
                 print('Transaction!')
                 print(payload)
-
+                transaction_type = 'message'
+                if isinstance(payload['message'], int):
+                    transaction_type = 'coins'
                 flag = 0
                 for r in node.ring:
                     if r['id'] == payload['receiver_id']:
                         flag = 1
-                        #TO BE FIXED
-                        #pub_key = r['public_key']
-                        #node.create_transaction(node.wallet.address, node.wallet.private_key, pk, int(a[2]))
+                        pub_key = r['public_key']
+
+                        node.all_lock.acquire()
+                        node.nonce += 1
+                        node.all_lock.release()
+
+                        if transaction_type == 'coins':
+                            trans = node.create_transaction(node.wallet.address, node.wallet.private_key, pub_key,
+                                                    transaction_type, node.nonce, payload['message'], None)
+                            print(f"{trans}")
+                            trans.printMe()
+
+                        if transaction_type == 'message':
+                            trans = node.create_transaction(node.wallet.address, node.wallet.private_key, pub_key,
+                                                    transaction_type, node.nonce, None, payload['message'])
+                            print(f"Created Transaction!! : \n {trans}")
+                            trans.printMe()
                         break
+
+                print(node.ring)
                 if flag == 0:
                     print("<recipient_address> invalid")
-                # payload = json.dumps(payload)
-                #
-                # response = requests.post(URL + "create_transaction", data=payload,
-                #                          headers={'Content-type': 'application/json', 'Accept': 'text/plain'})
-                # if response.status_code == 200:
-                #     print('Transaction Done!')
-                # else:
-                #     print(f'Error: {response.text}')
-            #Stake
+
+            # Stake
             elif choice.startswith('s'):
                 params = choice.split()
 
                 payload = {'ammount': params[1]}
                 print('Stake!')
                 print(payload)
-                # payload = json.dumps(payload)
-                #
-                # response = requests.post(URL + "stake_ammount", data=payload,  # mporei na prepei na to allajoyme
-                #                          )
-                # if response.status_code == 200:
-                #     print('Successful Stake')
-                # else:
-                #     print(f'Error: {response.text}')
+
+                stake = node.stake(payload['ammount'])
+                print(stake)
+
             # view last transaction
             elif choice == 'view':
                 node.chain.view()
@@ -108,8 +113,7 @@ def read_transaction(node):  # na balw to cli script
                 # print(response.json())
             # balance
             elif choice == 'balance':
-                print(node.BCCs)
-                print(node.current_BCCs)
+                print(node.balance)
             # help
             elif choice == 'help':
                 print(help_message)
@@ -164,13 +168,23 @@ def MakeFirstTransaction(pub_key, ip, port):
             time.sleep(0.1)
         else:
             break
-    node.nonce += 1 #ayksanw to nonce PREPEI NA VALW LOCK??????
+
+    # node.all_lock.acquire()
+    # node.nonce += 1  # ayksanw to nonce PREPEI NA VALW LOCK??????
+    # node.all_lock.release()
+
     # pub_key einai JSON kai bootstrap_public_key RSA
     transaction = node.create_transaction(bootstrap_public_key, node.wallet.private_key, pub_key,
-                                          'payment', amount, node.nonce,
-                                          'your first money')  # ayto to node einai to bootstap se ayto to script
-    if transaction.verify_signature():
-        print("VERIFIED !!!!!!!!!!!!!!!!!!")
+                                          'coins', node.nonce, amount,
+                                          'First Salary')  # ayto to node einai to bootstap se ayto to script
+
+    genesis_block.add_transaction(transaction)
+
+    if BootstrapDict['nodeCount'] == BootstrapDict['N']:
+        blockchain.add_block_to_chain(genesis_block)
+        print('\nGenesis\n')
+        print(node.chain.printMe())
+
     # ti kanoyme me to nonce?? pros to paron to bazw 2
     transaction.printMe()
     return transaction
@@ -178,6 +192,27 @@ def MakeFirstTransaction(pub_key, ip, port):
 
 ######################################################
 
+# @app.route('/ValidateTransaction', methods=['POST'])
+# def ValidateTransaction():
+#     if request is None:
+#         return "Error: Please supply a valid Transaction", 400
+#     data = request.json
+#     if data is None:
+#         return "Error: Please supply a valid Transaction", 400
+#     print(f'Received  ValidateTransaction data: {data}')
+#     return data
+#     # trans = jsonpickle.decode(data["transaction"])
+#     # valid = node.validate_transaction(trans)                        #to be fixed!!!
+#     # if(valid):
+#     #     node.add_transaction_to_block(transaction)                  #to be fixed!!!!!!!
+#     #
+#     #     return "Transaction Validated by Node {} !".format(node.id), 200
+#     # else:
+#     #     return "Error: Not valid!", 400
+
+@app.route('/Live', methods=['GET'])
+def Live():
+    return "I am alive!", 200
 
 @app.route('/nodes/register', methods=['POST'])
 def register_nodes():
@@ -208,12 +243,12 @@ def register_nodes():
     # print()
 
     node.ring.append({'id': BootstrapDictInstance['nodeCount'] - 1, 'ip': data['ip'], 'port': data['port'],
-                      'public_key': data['public_key'], 'balance': 0})  # na ftiajv to load poy erxete apo to Rest.py
+                      'public_key': data['public_key'], 'balance': 1000})  # na ftiajv to load poy erxete apo to Rest.py
 
     # print("Node Count:", BootstrapDict['nodeCount'])
     # print("N:", BootstrapDict['N'])
     if (BootstrapDict['nodeCount'] == BootstrapDict['N']):
-        start_new_thread(FirstBroadcast, (node.ring,))      #8elei ftiajimo
+        start_new_thread(FirstBroadcast, (node.ring,))  # 8elei ftiajimo
 
     print('\nBlockchain\n')
     print(blockchain.printMe())
@@ -244,15 +279,16 @@ def register_nodes():
                         'bootstrap_public_key': BootstrapDictInstance['bootstrap_public_key'],
                         'blockchain': serialized_blockchain_b64,
                         'block_capacity': BLOCK_CAPACITY,
-                        'start_ring': {'id': 0, 'ip': '127.0.0.1', 'port': '5000',             # to be fixed for OUR bootstrap!!!
+                        'start_ring': {'id': 0, 'ip': '127.0.0.1', 'port': '5000',  # to be fixed for OUR bootstrap!!!
                                        'public_key': BootstrapDictInstance['bootstrap_public_key'],
-                                       'balance': 0},
+                                       'balance': 1000},
                         'current_block': serialized_current_block_b64,
                         'BCCs': node.BCCs,
                         'current_BCCs': node.current_BCCs})
 
     print(f"Response : {response.json}")
     return response
+
 
 @app.route('/ValidateTransaction', methods=['POST'])
 def ValidateTransaction():
@@ -279,6 +315,7 @@ def ValidateTransaction():
     # else:
     #     return "Error: Not valid!", 400
 
+
 @app.route('/AddBlock', methods=['POST'])
 def AddBlock():
     if request is None:
@@ -292,10 +329,10 @@ def AddBlock():
         return "Error: Please supply a valid Block", 400
 
     block.revert_transactions()
-    if(block.index > 0):
+    if (block.index > 0):
         valid = node.validate_block(block)
 
-        if(valid):
+        if (valid):
             node.chain.add_block_to_chain(block)
 
             for t in block.listOfTransactions:
@@ -313,6 +350,7 @@ def AddBlock():
         else:
             node.resolve_conflicts()
     return "OK", 200
+
 
 @app.route('/')
 def home():
@@ -343,13 +381,13 @@ if __name__ == '__main__':
     BootstrapDict['bootstrap_public_key'] = makeRSAjsonSendable(bootstrap_public_key)
     BootstrapDict['N'] = N
 
-    #print(BootstrapDict)
+    # print(BootstrapDict)
 
     # create genesis block
     genesis_block = node.create_new_block(0, 1, time.time(),
                                           BLOCK_CAPACITY, 0)  # index = 0, previousHash = 1, capacity = BLOCK_CAPACITY, validator=0
 
-    #TSEKARW AN TO SERIALIZATION TOY BLOCK DOYLEVEI, ALLAZEI TO LOCK EPEIDH TO KANW EXCLUDE!!! EINAI THEMA??
+    # TSEKARW AN TO SERIALIZATION TOY BLOCK DOYLEVEI, ALLAZEI TO LOCK EPEIDH TO KANW EXCLUDE!!! EINAI THEMA??
     # serialized_genesis_block = pickle.dumps(genesis_block)
     #
     # # Deserialize the serialized data
@@ -374,16 +412,20 @@ if __name__ == '__main__':
     # first transaction
     amount = 1000 * N
     BootstrapDictInstance = BootstrapDict.copy()
-    node.nonce += 1
+
+    # node.all_lock.acquire()
+    # node.nonce += 1
+    # node.all_lock.release()
+
     first_transaction = node.create_transaction(0, None, BootstrapDictInstance['bootstrap_public_key'],
-                                                'payment', amount, node.nonce, 'First Transaction')
+                                                'coins', node.nonce, amount, 'First Transaction')
     # # TSEKARW AN TO SERIALIZATION TOY TRANSACTION DOYLEVEI, EINAI OK
     # serialized_transaction = pickle.dumps(first_transaction)
     #
     # # Deserialize the pickled data
     # deserialized_transaction = pickle.loads(serialized_transaction)
     #
-    # # Compare attributes to ensure successful serialization and deserialization
+    # # Compare attributes to ensure successful serialization and deserializationamount
     # if first_transaction.__dict__ == deserialized_transaction.__dict__:
     #     print("Serialization and deserialization successful for Transaction object!")
     # else:
@@ -398,7 +440,6 @@ if __name__ == '__main__':
     # print('\nGenesis block after first transaction: \n')
     # print(f'{genesis_block.printMe()}')
     # vale to genesis block sto blockchain kai ftiaxe neo block gia na einai to current block
-    blockchain.add_block_to_chain(genesis_block)
     node.chain = blockchain
     print(node.chain.printMe())
     node.previous_block = None
