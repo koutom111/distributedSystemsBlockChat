@@ -194,8 +194,6 @@ def register_nodes():
     #     print("Serialization or deserialization failed.")
 
     start_new_thread(MakeFirstTransaction, (data['public_key'], data['ip'], data['port'],))
-    print(f"Node:{node.id} BCCs: {node.BCCs}")
-    print(f"Node: {node.id} Current BCCs: {node.current_BCCs}")
     print(f"Port number {data['port']} is here")
 
     current_block_pickled = pickle.dumps(node.current_block)
@@ -209,8 +207,7 @@ def register_nodes():
                                        'public_key': BootstrapDictInstance['bootstrap_public_key'],
                                        'balance': 0},
                         'current_block': serialized_current_block_b64,
-                        'BCCs': node.BCCs,
-                        'current_BCCs': node.current_BCCs})
+                        'balance': node.balance})
 
     print(f"Response : {response.json}")
     return response

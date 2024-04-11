@@ -45,8 +45,7 @@ class Node:
         self.chain = None
         self.current_id_count = None  # +1 every time a node is added
         self.id = None  # 0...n-1   #auto 8a to balei o bootstrap
-        self.BCCs = []
-        self.current_BCCs = []
+        self.balance = 0
         self.wallet = None  # created with generate_wallet()   / prepei na to steilei sto bootstrap
         self.ring = []
         self.generate_wallet()
@@ -55,7 +54,7 @@ class Node:
         self.block_capacity = None
         self.myip = None
         self.myport = None
-        self.completed_transactions = []
+        self.temp_transactions = []
         self.validated_transactions = []
         self.all_lock = threading.Lock()
         self.nonce = 0 #DIKO MAS
@@ -154,29 +153,6 @@ class Node:
         serialized_trans_b64 = base64.b64encode(json_trans).decode('utf-8')
         res = requests.post(baseurl + "ValidateTransaction", json={'transaction': serialized_trans_b64})
 
-    def validate_transaction(self, transaction):
-        # sender_address = transaction.sender_address
-        # h = SHA.new(transaction.transaction_myid.encode())
-        # signature = transaction.signature
-        # pubkey = sender_address
-        # verified = PKCS1_v1_5.new(pubkey).verify(h, signature)
-        verified = transaction.verify_signature()
-        if (not (verified)):
-            return False
-
-        realsender = int(transaction.reals)
-        realreceiver = int(transaction.realr)
-
-        if (verified and transaction.amount <= self.current_BCCs[int(realsender)][0]):
-            self.current_BCCs[realsender][0] = self.current_BCCs[realsender][0] - transaction.amount
-            self.current_BCCs[realsender][1].append(transaction.transaction_id_hex)
-            self.current_BCCs[realreceiver][0] = self.current_BCCs[realreceiver][0] + transaction.amount
-            self.current_BCCs[realreceiver][1].append(transaction.transaction_id_hex)
-            return True
-
-        else:
-            return False
-
     def add_transaction_to_block(self, transaction):
         self.all_lock.acquire()
         for b in self.chain.chain:
@@ -221,7 +197,7 @@ class Node:
                 pass
             finally:
                 self.all_lock.acquire()
-            mined_block = self.mine_block()
+            minted_block = self.mint_block()
             self.current_block = self.create_new_block(self.current_block.index + 1, self.current_block.currentHash_hex,
                                                        0, time.time(), self.current_block.difficulty,
                                                        self.current_block.capacity)
@@ -272,44 +248,61 @@ class Node:
         if not transaction.verify_signature():
             return False
 
-        if transaction.id in self.seen:
+        if transaction.transaction_id_hex in self.validated_transactions:
             return True
 
-        # If login is still going, you dont have the ring data (keys, balances, stakes) and there is nothing
-        # to really check. Just return, and don't keep the transaction.
-        if not self.login_complete:
-            return True
-
-        trans = Transaction(transaction.sender_address, transaction.sender_private_key, transaction.recipient_address, transaction.transaction_type, transaction.nonce, transaction.amount, transaction.message,
+        trans = Transaction(transaction.sender_address, transaction.sender_private_key, transaction.receiver_address, transaction.transaction_type, transaction.nonce, transaction.amount, transaction.message,
                  transaction.reals, transaction.realr)
 
         coins_needed = trans.calculate_charge()
+        if self.wallet.public_key == trans.sender_address:
+            balance = self.balance
+            stake = self.staking
+            nonce = self.nonce
+        else:
+            for r in self.state:
+                if r['public_key'] == transaction.sender_address:
+                    sender_dict = r
+                    balance = sender_dict['balance']
+                    stake = sender_dict['staking']
+                    nonce = sender_dict['nonce']
 
-        sender_dict = self.ring[transaction.sender_address]
-        balance = sender_dict['balance']
-        stake = sender_dict['stake']
-        if (type == 'stake') & (coins_needed > balance):
+        if (type(transaction.receiver_address) == type(0)) & (coins_needed > balance):
             return False
         elif coins_needed > balance - stake:
             # logging.info('Sender does not have enough coins.')
             return False
+        elif nonce >= trans.nonce:
+            return False
         else:
-            # logging.info('Sender okay to send.')
+            if self.wallet.public_key == trans.sender_address:
+                self.balance -= trans.calculate_charge()
+                self.nonce = trans.nonce
+            elif not (type(transaction.receiver_address) == type(0)):
+                sender_dict['balance'] -= trans.calculate_charge()
+                sender_dict['nonce'] = trans.nonce
+            else:
+                sender_dict['staking'] = transaction.amount
+                sender_dict['nonce'] = trans.nonce
 
-            # If login is done, we keep the transaction.
-            # Afterwards, we check if we need to mint a block.
-            # Update the sender balance.
-            if type != 'stake':
-                sender_dict['balance'] -= trans.transaction_amount()
 
             # logging.info('balances after trans', [node['balance'] for k,node in self.node_ring.items()])
+            # Add the received transaction, only if it has not been seen in a previous block!
+            self.temp_transactions.append(trans)
+            self.current_block.listOfTransactions.append(trans)
 
-            # Add the recieved transaction, only if it has not been seen in a previous block!
-            self.transactions.append(trans)
-
-            if len(self.transactions) == self.capacity:
-                self.mint_block()
-                self.transactions = []
+            if len(self.temp_transactions) == self.block_capacity:
+                minted = self.mint_block()
+                if minted is not None:
+                    for r in self.ring:
+                        start_new_thread(self.broadcast_block, (minted, r,))
+                else:
+                        # wait
+                self.temp_transactions = []
+                #create new block
+                self.current_block = self.create_new_block(self.current_block.index + 1,
+                                                           self.current_block.compute_current_hash, time.time(),
+                                                           self.current_block.capacity, None)
             else:
                 pass
                 # logging.info('Not minting because transaction length is: ', len(self.transactions))
@@ -332,6 +325,47 @@ class Node:
             return True
         else:
             return False
+
+    def update_recipient_balances(self, block):
+        # logging.info('Validating block from minter', block.validator)
+        for trans in block.listOfTransactions:
+            # delete from list of pending transactions, if its still there.
+            i = 0
+            while i < len(self.temp_transactions):
+                if self.temp_transactions[i].transaction_id_hex == trans.transaction_id_hex:
+                    del self.temp_transactions[i]
+                    continue
+                i += 1
+
+            if trans.transaction_id_hex not in self.validated_transactions:
+                validator = block.validator
+
+                if (type(trans.receiver_address) == type(0)):
+                    amount = trans.amount
+                    sender = trans['sender_address']
+                    for r in self.state:
+                        if r['public_key'] == sender:
+                            r['staking'] = amount
+                elif trans.type_of_transaction == 'coins':
+                    recipient = trans['receiver_address']
+                    amount = trans.amount
+                    # Update recipient balance
+                    for r in self.state:
+                        if r['public_key'] == recipient:
+                            r['balance'] += amount
+                    # Give 3% to the block validator
+                        if r['public_key'] == validator:
+                            r['balance'] += amount * 0.03
+                    if self.wallet.public_key == recipient:
+                        self.balance += amount
+
+                elif trans.type_of_transaction == 'message':
+                    amount = len(trans.message)
+                    for r in self.state:
+                        if r['public_key'] == validator:
+                            r['balance'] += amount
+
+                self.validated_transactions.append(trans.transaction_id_hex)
 
     def validate_chain(self, blockchain):
         for block in blockchain.chain:

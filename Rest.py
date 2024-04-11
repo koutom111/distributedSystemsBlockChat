@@ -101,14 +101,14 @@ def ValidateTransaction():
         trans.sender_address = makejsonSendableRSA(trans.sender_address)
     print(trans.message)
     print("BROADCASTED TRANSACTION!!!!!!!!!!!!!!")
-    return "Great!", 200
-    # valid = node.validate_transaction(trans)
-    # if(valid):
-    #     node.add_transaction_to_block(trans)
-    #
-    #     return "Transaction Validated by Node {} !".format(node.id), 200
-    # else:
-    #     return "Error: Not valid!", 400
+
+    valid = node.validate_transaction(trans)
+    if(valid):
+        node.current_block.add_transaction(trans)
+
+        return "Transaction Validated by Node {} !".format(node.id), 200
+    else:
+        return "Error: Not valid!", 400
 
 @app.route('/AddBlock', methods=['POST'])
 def AddBlock():
@@ -127,22 +127,12 @@ def AddBlock():
         valid = node.validate_block(block)
 
         if(valid):
-            node.chain.add_block_to_chain(block)
-
-            for t in block.listOfTransactions:
-                outputs = t.transaction_outputs
-                id = outputs[0][1]
-                realreceiver = outputs[0][2]
-                realsender = outputs[1][2]
-                amount = outputs[0][3]
-                node.NBCs[realreceiver][0] = node.NBCs[realreceiver][0] + amount
-                node.NBCs[realreceiver][1].append(id)
-                node.NBCs[realsender][0] = node.NBCs[realsender][0] - amount
-
+            node.update_recipient_balances(block)
+            #?????????
             for tran_iter in block.listOfTransactions:
-                node.completed_transactions.append(tran_iter)
+                node.temp_transactions.append(tran_iter)
         else:
-            node.resolve_conflicts()
+            return "Error: Invalid Block", 400
     return "OK", 200
 
 def UpdateState(ring):
@@ -187,8 +177,7 @@ def ContactBootstrapNode(baseurl, host, port):
     current_block = pickle.loads(serialized_current_block)
 
     node.current_block = current_block
-    node.BCCs = rejson['BCCs']  # ????????????????????????????????????????????
-    node.current_BCCs = rejson['current_BCCs']  # ?????????????????????????????????????
+    node.balance = rejson['balance']
 
     # blockchain_dict = []
     # for block in blockchain.chain:
