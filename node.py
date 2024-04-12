@@ -208,8 +208,8 @@ class Node:
 
         coins_needed = trans.calculate_charge()
         if self.wallet.public_key == trans.sender_address:
-            balance = self.balance
-            stake = self.staking
+            balance = float(self.balance)
+            stake = float(self.staking)
             nonce = self.nonce
             if nonce > trans.nonce:
                 return False ,f'nonce>{nonce}'
@@ -223,8 +223,8 @@ class Node:
                 # #     trans.receiver_address = makejsonSendableRSA(trans.receiver_address)
                 if r['public_key'] == trans.sender_address:
                     sender_dict = r
-                    balance = sender_dict['balance']
-                    stake = sender_dict['staking']
+                    balance = float(sender_dict['balance'])
+                    stake = float(sender_dict['staking'])
                     nonce = sender_dict['nonce']
 
         if (type(trans.receiver_address) == type(0)) & (coins_needed > balance):
@@ -266,7 +266,7 @@ class Node:
 
                     if trans.transaction_type == 'coins':
                         recipient = makejsonSendableRSA(trans.receiver_address)
-                        amount = trans.amount
+                        amount = float(trans.amount)
                         # Update recipient balance
                         for r in self.state:
                             # Give 3% to the block validator
@@ -291,7 +291,7 @@ class Node:
 
                     if trans.transaction_type == 'coins':
                         recipient = makejsonSendableRSA(trans.receiver_address)
-                        amount = trans.amount
+                        amount = float(trans.amount)
                         # Update recipient balance
                         for r in self.state:
                             # Give 3% to the block validator
@@ -325,7 +325,7 @@ class Node:
 
                     if trans.transaction_type == 'coins':
                         recipient = makejsonSendableRSA(trans.receiver_address)
-                        amount = trans.amount
+                        amount = float(trans.amount)
                         # Update recipient balance
                         if self.wallet.public_key == recipient:
                             self.balance += amount

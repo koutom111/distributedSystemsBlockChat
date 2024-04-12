@@ -123,10 +123,10 @@ def read_transaction(node):  # na balw to cli script
                 print("Invalid action. Try again!")
     # ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????//
     else:
-        input_file = f"../5nodes/trans{node.id}.txt"
+        input_file = f"5nodes/trans{node.id}.txt"
         with open(input_file, 'r') as file:
             lines = file.readlines()
-
+        node.stake(10)
         # Regular expression pattern to match 'id' followed by a number and the message
         pattern = r'id(\d+)\s+(.*)'
         start_time = time.time()
@@ -137,11 +137,10 @@ def read_transaction(node):  # na balw to cli script
             if match:
                 id = int(match.group(1))
                 message = match.group(2)
-
-            for node in node.state:
-                if node['id'] == id:
+            for n in node.state:
+                if n['id'] == id:
                     node.nonce+=1
-                    node.create_transaction(node.wallet.public_key,node.wallet.private_key, node['public_key'], "message", node.nonce, message)
+                    node.create_transaction(node.wallet.public_key,node.wallet.private_key, n['public_key'], 'message', node.nonce, None, message)
                     num_of_transactions += 1
                     break
         end_time = time.time()
@@ -153,7 +152,8 @@ def read_transaction(node):  # na balw to cli script
 
         timestamps = []
         for block in node.chain.chain:
-            timestamps.append(block.timestamp)
+            if(block.index>0):
+                timestamps.append(block.timestamp)
 
         timestamps.sort()
         print("TIMESTAMPS:", timestamps)
@@ -189,6 +189,10 @@ def FirstBroadcast(ring):
         serialized_load_b64 = base64.b64encode(json_load).decode('utf-8')
         resRing = requests.post(baseurl + "UpdateRing", json=serialized_load_b64)
         print(resRing)
+    for n in node.ring:
+        n['public_key'] = makejsonSendableRSA(n['public_key'])
+    for s in node.state:
+        s['public_key'] = makejsonSendableRSA(s['public_key'])
     start_new_thread(read_transaction, (node,))
 
 
@@ -279,11 +283,11 @@ def register_nodes():
     # print()
 
     node.ring.append({'id': BootstrapDictInstance['nodeCount'] - 1, 'ip': data['ip'], 'port': data['port'],
-                      'public_key': data['public_key'], 'balance': 1000})  # na ftiajv to load poy erxete apo to Rest.py
+                      'public_key': data['public_key'], 'balance': float(1000)})  # na ftiajv to load poy erxete apo to Rest.py
     node.state.append({
             'id': BootstrapDictInstance['nodeCount'] - 1,
             'public_key': data['public_key'],
-            'balance': int(1000),
+            'balance': float(1000),
             'staking': 0,
             'nonce': 0
         })
@@ -373,7 +377,7 @@ def ValidateTransaction():
 
         if trans.transaction_type == 'coins':
             recipient = trans.receiver_address
-            amount = trans.amount
+            amount = float(trans.amount)
             # Update recipient balance
             if node.wallet.public_key == recipient:
                 node.balance += amount
@@ -394,8 +398,9 @@ def ValidateTransaction():
                 print(f'I received message: {message} from {trans.sender_address}')
                 print('-------------------------------------------------')
 
-
-
+        print("!!!!!!!!!!!!!!!!!!!!!!!LETS SEEEEEEEEEEEEEEEEEEEEE!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(len(node.temp_transactions))
+        print(node.block_capacity)
         if len(node.temp_transactions) == node.block_capacity:
             minted = node.mint_block()
             if minted is not None:
@@ -418,6 +423,7 @@ def ValidateTransaction():
 
 @app.route('/AddBlock', methods=['POST'])
 def AddBlock():
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ADD BLOCK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     if request is None:
         return "Error: Please supply a valid Block", 400
     rejson = request.json
@@ -435,6 +441,7 @@ def AddBlock():
         if (valid):
             node.update_recipient_balances(block)
             node.traceback_transaction()
+            node.chain.add_block_to_chain(block)
         else:
             return "Error: Invalid Block", 400
         return "OK", 200
@@ -462,6 +469,7 @@ if __name__ == '__main__':
     node.id = 0
     node.myip = host  # '192.168.1.5'
     node.myport = port
+    node.block_capacity = BLOCK_CAPACITY
 
     bootstrap_public_key = node.wallet.public_key
 
