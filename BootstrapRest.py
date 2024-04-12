@@ -25,8 +25,8 @@ from Crypto.Signature import PKCS1_v1_5
 import base64
 
 PRINTCHAIN = False
-#CLIENT = 1  # read transactions from noobcash client
-CLIENT = 0  # read transactions from txt
+CLIENT = 1  # read transactions from blockchat client
+#CLIENT = 0
 
 app = Flask(__name__)
 CORS(app)
