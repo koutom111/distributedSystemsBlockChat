@@ -68,7 +68,7 @@ def read_transaction(node):  # na balw to cli script
                 print('Transaction!')
                 print(payload)
                 transaction_type = 'message'
-                if isinstance(payload['message'], int):
+                if payload['message'].isdigit():
                     transaction_type = 'coins'
                 flag = 0
                 for r in node.ring:
@@ -193,6 +193,7 @@ def FirstBroadcast(ring):
 
 
 def MakeFirstTransaction(pub_key, ip, port):
+    print(MakeFirstTransaction)
     amount = 1000
     baseurl = 'http://{}:{}/'.format(ip, port)
     while (True):
@@ -279,7 +280,13 @@ def register_nodes():
 
     node.ring.append({'id': BootstrapDictInstance['nodeCount'] - 1, 'ip': data['ip'], 'port': data['port'],
                       'public_key': data['public_key'], 'balance': 1000})  # na ftiajv to load poy erxete apo to Rest.py
-
+    node.state.append({
+            'id': BootstrapDictInstance['nodeCount'] - 1,
+            'public_key': data['public_key'],
+            'balance': int(1000),
+            'staking': 0,
+            'nonce': 0
+        })
     # print("Node Count:", BootstrapDict['nodeCount'])
     # print("N:", BootstrapDict['N'])
     if (BootstrapDict['nodeCount'] == BootstrapDict['N']):
@@ -301,7 +308,7 @@ def register_nodes():
     #     print("Serialization and deserialization successful!")
     # else:
     #     print("Serialization or deserialization failed.")
-
+    print(f'Going for first transaction {data}')
     start_new_thread(MakeFirstTransaction, (data['public_key'], data['ip'], data['port'],))
     print(f"Port number {data['port']} is here")
 
@@ -316,7 +323,7 @@ def register_nodes():
                                        'public_key': BootstrapDictInstance['bootstrap_public_key'],
                                        'balance': 1000},
                         'current_block': serialized_current_block_b64,
-                        'balance': node.balance})
+                        'balance': 1000})
 
     print(f"Response : {response.json}")
     return response
@@ -336,12 +343,58 @@ def ValidateTransaction():
     # den me enoxlei to receiver_address na einai json PROS TO PARON
     if isinstance(trans.sender_address, str):
         trans.sender_address = makejsonSendableRSA(trans.sender_address)
+    if isinstance(trans.receiver_address, str):
+        trans.receiver_address = makejsonSendableRSA(trans.receiver_address)
     print(trans.message)
     print("BROADCASTED TRANSACTION!!!!!!!!!!!!!!")
 
-    valid = node.validate_transaction(trans)
-    if(valid):
+    valid, message = node.validate_transaction(trans)
+    print(message)
+    if valid:
         node.temp_transactions.append(trans)
+
+        node.all_lock.acquire()    #!!!!!!!
+
+        if node.wallet.public_key == trans.sender_address: #an eimai o sender
+            if (type(trans.receiver_address) == type(0)):
+                node.staking = trans.amount                 #an exw kanei egw stake
+            else:
+                node.balance -= trans.calculate_charge()        #an egw exw xrewsei kapoion
+        elif not (type(trans.receiver_address) == type(0)):   #an den einai stake kai kapoios allos einai o sender
+            for r in node.state:
+                if r['public_key'] == trans.sender_address:         #vres poios einai o sender kai afairesai poso
+                    r['balance'] -= trans.calculate_charge()
+                    r['nonce'] = trans.nonce
+        else:
+            for r in node.state:                            #vres poios exei balei na kanei stake
+                if r['public_key'] == trans.sender_address:
+                  r['staking'] = trans.amount
+                  r['nonce'] = trans.nonce
+
+        if trans.transaction_type == 'coins':
+            recipient = trans.receiver_address
+            amount = trans.amount
+            # Update recipient balance
+            if node.wallet.public_key == recipient:
+                node.balance += amount
+            else:
+                for r in node.state:
+                    if r['public_key'] == recipient:
+                        r['balance'] += amount
+
+        node.all_lock.release()
+
+        if trans.transaction_type == 'message':
+            recipient = trans.receiver_address
+            message = trans.message
+            # Update recipient balance
+            if node.wallet.public_key == recipient:
+                print()
+                print('-------------------------------------------------')
+                print(f'I received message: {message} from {trans.sender_address}')
+                print('-------------------------------------------------')
+
+
 
         if len(node.temp_transactions) == node.block_capacity:
             minted = node.mint_block()
@@ -349,19 +402,16 @@ def ValidateTransaction():
                 for r in node.ring:
                     start_new_thread(node.broadcast_block, (minted, r,))
                     node.temp_transactions = []
-            else:
-                # wait
 
-            # create new block
             node.current_block = node.create_new_block(node.current_block.index + 1,
                                                        node.current_block.compute_current_hash, time.time(),
                                                        node.current_block.capacity, None)
-        else:
-            pass
-            # logging.info('Not minting because transaction length is: ', len(self.transactions))
-
+            print("Transaction Validated and New Block Created by Node {} !".format(node.id))
+            return "Transaction Validated and New Block Created by Node {} !".format(node.id), 200
+        print("Transaction Validated")
         return "Transaction Validated by Node {} !".format(node.id), 200
     else:
+        print("Invalid Transaction")
         return "Error: Not valid!", 400
 
 
@@ -382,14 +432,12 @@ def AddBlock():
     if(block.index > 0):
         valid = node.validate_block(block)
 
-        if(valid):
+        if (valid):
             node.update_recipient_balances(block)
-            #?????????
-            for tran_iter in block.listOfTransactions:
-                node.temp_transactions.append(tran_iter)
+            node.traceback_transaction()
         else:
             return "Error: Invalid Block", 400
-    return "OK", 200
+        return "OK", 200
 
 
 @app.route('/')

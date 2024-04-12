@@ -79,7 +79,7 @@ def UpdateRing():
     #                                       'payment', node.nonce, 500,
     #                                       'your first money')
 
-    # while(not(node.current_BCCs[-1][0] == 100 or node.BCCs[-1][0] == 100)):
+    # while(not(node.balance == 1000)):
     #     pass
     start_new_thread(read_transaction, (node,))
 
@@ -120,44 +120,58 @@ def ValidateTransaction():
     # den me enoxlei to receiver_address na einai json PROS TO PARON
     if isinstance(trans.sender_address, str):
         trans.sender_address = makejsonSendableRSA(trans.sender_address)
+    if isinstance(trans.receiver_address, str):
+        trans.receiver_address = makejsonSendableRSA(trans.receiver_address)
     print(trans.message)
     print("BROADCASTED TRANSACTION!!!!!!!!!!!!!!")
 
-    valid = node.validate_transaction(trans)
-    if(valid):
+    valid, message = node.validate_transaction(trans)
+    print(message)
+    if valid:
+
         node.temp_transactions.append(trans)
 
-        if node.wallet.public_key == trans.sender_address:
+        node.all_lock.acquire()
+
+        if node.wallet.public_key == trans.sender_address: #an eimai o sender
             if (type(trans.receiver_address) == type(0)):
-                node.staking = trans.amount
+                node.staking = trans.amount                 #an exw kanei egw stake
             else:
-                node.balance -= trans.calculate_charge()
-        elif not (type(trans.receiver_address) == type(0)):
+                node.balance -= trans.calculate_charge()        #an egw exw xrewsei kapoion
+        elif not (type(trans.receiver_address) == type(0)):   #an den einai stake kai kapoios allos einai o sender
             for r in node.state:
-                if r['public_key'] == trans.sender_address:
+                if r['public_key'] == trans.sender_address:         #vres poios einai o sender kai afairesai poso
                     r['balance'] -= trans.calculate_charge()
                     r['nonce'] = trans.nonce
         else:
-            for r in node.state:
+            for r in node.state:                            #vres poios exei balei na kanei stake
                 if r['public_key'] == trans.sender_address:
                   r['staking'] = trans.amount
                   r['nonce'] = trans.nonce
 
-        if (type(trans.receiver_address) == type(0)):
-            amount = trans.amount
-            sender = trans['sender_address']
-            for r in node.state:
-                if r['public_key'] == sender:
-                    r['staking'] = amount
-        elif trans.transaction_type == 'coins':
-            recipient = makejsonSendableRSA(trans['receiver_address'])
+        if trans.transaction_type == 'coins':
+            recipient = trans.receiver_address
             amount = trans.amount
             # Update recipient balance
-            for r in node.state:
-                if r['public_key'] == recipient:
-                    r['balance'] += amount
             if node.wallet.public_key == recipient:
                 node.balance += amount
+            else:
+                for r in node.state:
+                    if r['public_key'] == recipient:
+                        r['balance'] += amount
+
+        node.all_lock.release()
+
+        if trans.transaction_type == 'message':
+            recipient = trans.receiver_address
+            message = trans.message
+            # Update recipient balance
+            if node.wallet.public_key == recipient:
+                print()
+                print('-------------------------------------------------')
+                print(f'I received message: {message} from {trans.sender_address}')
+                print('-------------------------------------------------')
+
 
 
         if len(node.temp_transactions) == node.block_capacity:
@@ -166,19 +180,16 @@ def ValidateTransaction():
                 for r in node.ring:
                     start_new_thread(node.broadcast_block, (minted, r,))
                     node.temp_transactions = []
-            else:
-                # wait
 
-            # create new block
             node.current_block = node.create_new_block(node.current_block.index + 1,
                                                        node.current_block.compute_current_hash, time.time(),
                                                        node.current_block.capacity, None)
-        else:
-            pass
-            # logging.info('Not minting because transaction length is: ', len(self.transactions))
-
+            print("Transaction Validated and New Block Created by Node {} !".format(node.id))
+            return "Transaction Validated and New Block Created by Node {} !".format(node.id), 200
+        print("Transaction Validated")
         return "Transaction Validated by Node {} !".format(node.id), 200
     else:
+        print("Invalid Transaction")
         return "Error: Not valid!", 400
 
 @app.route('/AddBlock', methods=['POST'])
@@ -199,9 +210,7 @@ def AddBlock():
 
         if(valid):
             node.update_recipient_balances(block)
-            #?????????
-            for tran_iter in block.listOfTransactions:
-                node.temp_transactions.append(tran_iter)
+            node.traceback_transaction()
         else:
             return "Error: Invalid Block", 400
     return "OK", 200
@@ -211,7 +220,7 @@ def UpdateState(ring):
         node.state.append({
             'id': r['id'],
             'public_key': r['public_key'],
-            'balance': r['balance'],
+            'balance': int(r['balance']),
             'staking': 0,
             'nonce': 0
         })
@@ -220,7 +229,7 @@ def UpdateState(ring):
     return node.state
 def ContactBootstrapNode(baseurl, host, port):
     public_key = node.wallet.public_key
-    load = {'public_key': makeRSAjsonSendable(public_key), 'ip': host, 'port': port}
+    load = {'public_key': makeRSAjsonSendable(public_key), 'ip': node.myip, 'port': node.myport}
     # print('\n load pub key\n')
     # print(load['public_key'])
     r = requests.post(baseurl + "nodes/register", json=load)

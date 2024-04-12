@@ -89,11 +89,15 @@ class Transaction:
     def calculate_charge(self):
         if type(self.receiver_address) == type(0):  # stake
             return self.amount
-        if self.transaction_type == 'coins':
-            total = self.amount + 0.03 * self.amount  # +3% charge
-            return total
-        elif self.transaction_type == 'message':
+        if self.transaction_type == 'message':
             return len(self.message)
+        elif self.transaction_type == 'coins':
+            amount = float(self.amount)
+            charge = int(0.03 * amount)
+            amount =int(amount)
+            total =amount + charge
+            return total
+
         else:
             print('Invalid type of transaction.')
             return 0
