@@ -172,7 +172,7 @@ def ValidateTransaction():
                 print(f'I received message: {message} from {trans.sender_address}')
                 print('-------------------------------------------------')
 
-        print("!!!!!!!!!!!!!!!!!!!!!!!LETS SEEEEEEEEEEEEEEEEEEEEE!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("!!!!!!!!!!!!!!!!!!!!!!!LETS SEE!!!!!!!!!!!!!!!!!!!!!!!!")
         print(len(node.temp_transactions))
         print(node.block_capacity)
         if len(node.temp_transactions) == node.block_capacity:
@@ -217,6 +217,22 @@ def AddBlock():
             return "Error: Invalid Block", 400
     return "OK", 200
 
+@app.route('/AddGenesisBlock', methods=['POST'])
+def AddGenesisBlock():
+    if request is None:
+        return "Error: Please supply a valid Block", 400
+    rejson = request.json
+    # Deserialize transaction received from the server
+    data = rejson["block"]
+    serialized_data = base64.b64decode(data)
+    block = pickle.loads(serialized_data)
+    if block is None:
+        return "Error: Please supply a valid Block", 400
+
+    block.revert_transactions()
+    node.chain.add_block_to_chain(block)
+
+    return "OK", 200
 def UpdateState(ring):
     for r in ring:
         node.state.append({

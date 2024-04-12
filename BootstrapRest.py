@@ -195,6 +195,13 @@ def FirstBroadcast(ring):
         s['public_key'] = makejsonSendableRSA(s['public_key'])
     start_new_thread(read_transaction, (node,))
 
+def GenesisBroadcast(block ,r):
+    baseurl = 'http://{}:{}/'.format(r['ip'], r['port'])
+    # kanw ta transactions xwris RSA attributes
+    block.convert_transactions()
+    json_block = pickle.dumps(block)
+    serialized_block_b64 = base64.b64encode(json_block).decode('utf-8')
+    res = requests.post(baseurl + "AddGenesisBlock", json={'block': serialized_block_b64})
 
 def MakeFirstTransaction(pub_key, ip, port):
     print(MakeFirstTransaction)
@@ -224,11 +231,12 @@ def MakeFirstTransaction(pub_key, ip, port):
         blockchain.add_block_to_chain(genesis_block)
         print('\nGenesis\n')
         print(node.chain.printMe())
+        for r in node.ring:
+            start_new_thread(GenesisBroadcast, (genesis_block,r,))
 
     # ti kanoyme me to nonce?? pros to paron to bazw 2
     transaction.printMe()
     return transaction
-
 
 ######################################################
 
@@ -398,7 +406,7 @@ def ValidateTransaction():
                 print(f'I received message: {message} from {trans.sender_address}')
                 print('-------------------------------------------------')
 
-        print("!!!!!!!!!!!!!!!!!!!!!!!LETS SEEEEEEEEEEEEEEEEEEEEE!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("!!!!!!!!!!!!!!!!!!!!!!!LETS SEE!!!!!!!!!!!!!!!!!!!!!!!!")
         print(len(node.temp_transactions))
         print(node.block_capacity)
         if len(node.temp_transactions) == node.block_capacity:

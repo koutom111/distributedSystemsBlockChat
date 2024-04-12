@@ -162,9 +162,11 @@ class Node:
         res = requests.post(baseurl + "ValidateTransaction", json={'transaction': serialized_trans_b64})
 
     def mint_block(self):
+        while not self.chain.chain:
+            pass
         state = self.state
         seed = self.chain.chain[-1].compute_current_hash()
-        total_stake = sum(node['staking'] for node in state)
+        total_stake = sum(float(node['staking']) for node in state)
 
         random.seed(seed)
 
@@ -176,7 +178,7 @@ class Node:
             rand_num = random.uniform(0, 1)
             cumulative_percentage = 0
             for node in state:
-                node_percentage = node['staking'] / total_stake
+                node_percentage = float(node['staking']) / total_stake
                 cumulative_percentage += node_percentage
                 if rand_num <= cumulative_percentage:
                     winner = node['public_key']
