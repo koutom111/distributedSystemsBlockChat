@@ -88,14 +88,13 @@ class Transaction:
 
     def calculate_charge(self):
         if type(self.receiver_address) == type(0):  # stake
-            return self.amount
+            return float(self.amount)
         if self.transaction_type == 'message':
-            return len(self.message)
+            return float(len(self.message))
         elif self.transaction_type == 'coins':
             amount = float(self.amount)
-            charge = int(0.03 * amount)
-            amount =int(amount)
-            total =amount + charge
+            charge = float(0.03 * amount)
+            total = amount + charge
             return total
 
         else:

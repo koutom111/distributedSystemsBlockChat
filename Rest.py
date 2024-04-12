@@ -151,7 +151,7 @@ def ValidateTransaction():
 
         if trans.transaction_type == 'coins':
             recipient = trans.receiver_address
-            amount = trans.amount
+            amount = float(trans.amount)
             # Update recipient balance
             if node.wallet.public_key == recipient:
                 node.balance += amount
@@ -172,8 +172,9 @@ def ValidateTransaction():
                 print(f'I received message: {message} from {trans.sender_address}')
                 print('-------------------------------------------------')
 
-
-
+        print("!!!!!!!!!!!!!!!!!!!!!!!LETS SEE!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(len(node.temp_transactions))
+        print(node.block_capacity)
         if len(node.temp_transactions) == node.block_capacity:
             minted = node.mint_block()
             if minted is not None:
@@ -211,16 +212,33 @@ def AddBlock():
         if(valid):
             node.update_recipient_balances(block)
             node.traceback_transaction()
+            node.chain.add_block_to_chain(block)
         else:
             return "Error: Invalid Block", 400
     return "OK", 200
 
+@app.route('/AddGenesisBlock', methods=['POST'])
+def AddGenesisBlock():
+    if request is None:
+        return "Error: Please supply a valid Block", 400
+    rejson = request.json
+    # Deserialize transaction received from the server
+    data = rejson["block"]
+    serialized_data = base64.b64decode(data)
+    block = pickle.loads(serialized_data)
+    if block is None:
+        return "Error: Please supply a valid Block", 400
+
+    block.revert_transactions()
+    node.chain.add_block_to_chain(block)
+
+    return "OK", 200
 def UpdateState(ring):
     for r in ring:
         node.state.append({
             'id': r['id'],
             'public_key': r['public_key'],
-            'balance': int(r['balance']),
+            'balance': float(r['balance']),
             'staking': 0,
             'nonce': 0
         })
@@ -258,6 +276,7 @@ def ContactBootstrapNode(baseurl, host, port):
 
     node.current_block = current_block
     node.balance = rejson['balance']
+    node.balance = float(node.balance)
 
     # blockchain_dict = []
     # for block in blockchain.chain:
