@@ -26,6 +26,7 @@ import jsonpickle
 import requests
 from _thread import *
 import threading
+import copy
 
 DEBUG = False
 PRINTCHAIN = False
@@ -165,13 +166,23 @@ class Node:
         while not self.chain.chain:
             pass
         state = self.state
+        my_node = {
+            'id': self.id - 1,
+            'public_key': self.wallet.public_key,
+            'balance': self.balance,
+            'staking': self.staking,
+            'nonce': self.nonce
+        }
+        state.append(my_node)
+        state = sorted(state, key=lambda node: node['id'])
         seed = self.chain.chain[-1].compute_current_hash()
         total_stake = sum(float(node['staking']) for node in state)
 
         random.seed(seed)
-
+        winner = None
+        winner_id = None
         # Check if all stakes are 0
-        if total_stake == 0:
+        if total_stake == float(0):
             # If all stakes are 0, choose a random node as the validator
             winner = random.choice([node['public_key'] for node in state])
         else:
@@ -182,22 +193,27 @@ class Node:
                 cumulative_percentage += node_percentage
                 if rand_num <= cumulative_percentage:
                     winner = node['public_key']
+                    winner_id = node['id']
                     break
-            else:
-                # If for some reason we don't select any node, return None
-                return None
-
+            # else:
+            #     # If for some reason we don't select any node, return None
+            #     return None
+        node_id = self.id - 1
+        self.state = [node for node in self.state if node['id'] != node_id]
+        if winner is None:
+            return None, "Winner is none. No changes to winner made."
         self.winner = winner
         if winner == self.wallet.public_key:
             self.current_block.lock.acquire()
+
             self.current_block.validator = self.wallet.public_key
             for trans in self.temp_transactions:
                 self.current_block.listOfTransactions.append(trans)
             self.current_block.lock.release()
 
-            return self.current_block
+            return self.current_block, f"I am the winner and this is my block: {self.current_block}"
         # if you didn't win don't return any block
-        return None
+        return None, f"I am not the winner the winner is {winner_id}"
 
     def validate_transaction(self, transaction):
         if not transaction.verify_signature():
@@ -214,7 +230,7 @@ class Node:
             stake = float(self.staking)
             nonce = self.nonce
             if nonce > trans.nonce:
-                return False ,f'nonce>{nonce}'
+                return False, f'nonce>{nonce}'
         else:
             for r in self.state:
                 # if isinstance(trans.sender_address, str):
@@ -241,16 +257,17 @@ class Node:
         baseurl = 'http://{}:{}/'.format(r['ip'], r['port'])
         # kanw ta transactions xwris RSA attributes
         block.convert_transactions()
+        if isinstance(block.validator, RSA.RsaKey):
+            block.validator = makeRSAjsonSendable(block.validator)
         json_block = pickle.dumps(block)
         serialized_block_b64 = base64.b64encode(json_block).decode('utf-8')
         res = requests.post(baseurl + "AddBlock", json={'block': serialized_block_b64})
-
 
     def validate_block(self, block):
         # gia na prospernaei to genesis
         if (block.previousHash_hex == 1 and block.validator == 0):
             return True
-        if (block.validator == self.winner and block.previousHash_hex == self.chain.chain[-1].compute_current_hash()):
+        if block.validator == self.winner and block.previousHash_hex == self.chain.chain[-1].compute_current_hash():
             return True
         else:
             return False
@@ -276,7 +293,7 @@ class Node:
                                 r['balance'] += amount * 0.03
                         if self.wallet.public_key == recipient:
                             self.balance += amount
-                    elif trans.type_of_transaction == 'message':
+                    elif trans.transaction_type == 'message':
                         amount = len(trans.message)
                         for r in self.state:
                             if r['public_key'] == validator:
@@ -302,7 +319,7 @@ class Node:
                         if self.wallet.public_key == recipient:
                             self.balance += amount
                             # and sender balance?
-                    elif trans.type_of_transaction == 'message':
+                    elif trans.transaction_type == 'message':
                         amount = len(trans.message)
                         for r in self.state:
                             if r['public_key'] == validator:
@@ -346,6 +363,16 @@ class Node:
                     self.all_lock.release()
 
                 self.validated_block_transactions.append(trans.transaction_id_hex)
+
+    def add_my_fees(self, block):
+        for trans in block.listOfTransactions:
+            if not (type(trans.receiver_address) == type(0)):
+                if trans.transaction_type == 'coins':
+                    amount = float(trans.amount)
+                    self.balance += amount * 0.03
+                elif trans.transaction_type == 'message':
+                    amount = len(trans.message)
+                    self.balance += amount
 
     def traceback_transaction(self):
         for trans in self.temp_transactions:

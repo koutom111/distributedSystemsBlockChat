@@ -26,8 +26,8 @@ from copy import deepcopy
 from Crypto.Signature import PKCS1_v1_5
 
 PRINTCHAIN = False
-CLIENT = 1                                    # read transactions from noobcash client
-#CLIENT = 0  # read transactions from txt
+#CLIENT = 1                                    # read transactions from noobcash client
+CLIENT = 0  # read transactions from txt
 
 app = Flask(__name__)
 CORS(app)
@@ -67,12 +67,12 @@ def UpdateRing():
         r1['public_key'] = makejsonSendableRSA(r1['public_key'])
         node.ring.append(r)
     # print(ring)
-    print("------------------------")
-    print(node.ring)
+    #print("------------------------")
+    #print(node.ring)
     UpdateState(node.ring)
     #node.stake(10)
-    print("&&&&&&&&&&&&&")
-    print(node.staking)
+    #print("&&&&&&&&&&&&&")
+    #print(node.staking)
     #GIA NA TESTARW AN DOYLEVEI TO BROADCAST_TRANSACTION
     # pub_key = node.ring[0]['public_key']
     # transaction = node.create_transaction(node.wallet.public_key, node.wallet.private_key, pub_key,
@@ -122,11 +122,9 @@ def ValidateTransaction():
         trans.sender_address = makejsonSendableRSA(trans.sender_address)
     if isinstance(trans.receiver_address, str):
         trans.receiver_address = makejsonSendableRSA(trans.receiver_address)
-    print(trans.message)
     print("BROADCASTED TRANSACTION!!!!!!!!!!!!!!")
 
     valid, message = node.validate_transaction(trans)
-    print(message)
     if valid:
 
         node.temp_transactions.append(trans)
@@ -155,6 +153,10 @@ def ValidateTransaction():
             # Update recipient balance
             if node.wallet.public_key == recipient:
                 node.balance += amount
+                print()
+                print('-------------------------------------------------')
+                print(f'I received message: {amount} from {trans.sender_address}')
+                print('-------------------------------------------------')
             else:
                 for r in node.state:
                     if r['public_key'] == recipient:
@@ -172,15 +174,18 @@ def ValidateTransaction():
                 print(f'I received message: {message} from {trans.sender_address}')
                 print('-------------------------------------------------')
 
-        print("!!!!!!!!!!!!!!!!!!!!!!!LETS SEE!!!!!!!!!!!!!!!!!!!!!!!!")
-        print(len(node.temp_transactions))
-        print(node.block_capacity)
         if len(node.temp_transactions) == node.block_capacity:
-            minted = node.mint_block()
+            print("I will try to mint")
+            minted, message = node.mint_block()
+            print(f"Message from mint <{message}> ")
             if minted is not None:
+                node.chain.add_block_to_chain(minted)
+                print(f"\n------I added block to chain----------\n")
+                print(f'Length of chain: {len(node.chain.chain)}')
+                node.temp_transactions = []
+                node.add_my_fees(minted)
                 for r in node.ring:
                     start_new_thread(node.broadcast_block, (minted, r,))
-                    node.temp_transactions = []
 
             node.current_block = node.create_new_block(node.current_block.index + 1,
                                                        node.current_block.compute_current_hash, time.time(),
@@ -195,6 +200,7 @@ def ValidateTransaction():
 
 @app.route('/AddBlock', methods=['POST'])
 def AddBlock():
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ADD BLOCK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     if request is None:
         return "Error: Please supply a valid Block", 400
     rejson = request.json
@@ -206,6 +212,8 @@ def AddBlock():
         return "Error: Please supply a valid Block", 400
 
     block.revert_transactions()
+    if isinstance(block.validator, str):
+        block.validator = makejsonSendableRSA(block.validator)
     if(block.index > 0):
         valid = node.validate_block(block)
 
@@ -214,7 +222,10 @@ def AddBlock():
             node.traceback_transaction()
             node.chain.add_block_to_chain(block)
         else:
+            print('\nI did NOT validate the block\n')
             return "Error: Invalid Block", 400
+    print()
+    print('I validate and added the block')
     return "OK", 200
 
 @app.route('/AddGenesisBlock', methods=['POST'])
@@ -294,7 +305,6 @@ def ContactBootstrapNode(baseurl, host, port):
     # kleidi = makeRSAjsonSendable(bootstrap_public_key)
     # print(kleidi)
 
-    print(node.current_block.printMe())
     print("Successfully registered")
 
 
